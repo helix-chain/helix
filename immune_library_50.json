@@ -1,0 +1,809 @@
+{
+  "version": "2.0.0",
+  "generated": "2026-04-11T23:43:00+09:00",
+  "description": "HELIX Immune Library — 50 Historical Attack Signatures",
+  "total_signatures": 50,
+  "total_loss_usd": 12947970000,
+  "attack_classes": 10,
+  "signatures": [
+    {
+      "id": "SIG-001",
+      "name": "The DAO Reentrancy",
+      "date": "2016-06-17",
+      "chain": "ethereum",
+      "attack_class": "reentrancy",
+      "loss_usd": 60000000,
+      "vulnerable_function": "splitDAO()",
+      "root_cause": "External call before state update; recursive withdrawal drains funds",
+      "pattern_keywords": [
+        "call.value",
+        "state_after_external_call",
+        "no_reentrancy_guard"
+      ],
+      "fix": "Apply checks-effects-interactions; add reentrancy guard"
+    },
+    {
+      "id": "SIG-002",
+      "name": "Parity Multisig Freeze",
+      "date": "2017-11-06",
+      "chain": "ethereum",
+      "attack_class": "access_control",
+      "loss_usd": 280000000,
+      "vulnerable_function": "initWallet()",
+      "root_cause": "Library contract had public init; attacker became owner and killed it",
+      "pattern_keywords": [
+        "delegatecall",
+        "unprotected_init",
+        "selfdestruct"
+      ],
+      "fix": "Use initializer modifier; never expose init on library"
+    },
+    {
+      "id": "SIG-003",
+      "name": "bZx Flash Loan",
+      "date": "2020-02-15",
+      "chain": "ethereum",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 8100000,
+      "vulnerable_function": "marginTrade()",
+      "root_cause": "Flash loan manipulated oracle price for undercollateralized borrow",
+      "pattern_keywords": [
+        "flash_loan",
+        "oracle_manipulation",
+        "single_block_price"
+      ],
+      "fix": "Use TWAP oracle; add flash loan detection"
+    },
+    {
+      "id": "SIG-004",
+      "name": "Harvest Finance",
+      "date": "2020-10-26",
+      "chain": "ethereum",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 34000000,
+      "vulnerable_function": "deposit()",
+      "root_cause": "Flash loan manipulated Curve pool price; vault minted excess shares",
+      "pattern_keywords": [
+        "flash_loan",
+        "curve_price",
+        "vault_share_inflation"
+      ],
+      "fix": "Use TWAP; add deposit delay; check share price deviation"
+    },
+    {
+      "id": "SIG-005",
+      "name": "PancakeBunny",
+      "date": "2021-05-19",
+      "chain": "bsc",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 45000000,
+      "vulnerable_function": "getReward()",
+      "root_cause": "Flash loan inflated LP price; performance fee calculated on manipulated price",
+      "pattern_keywords": [
+        "flash_loan",
+        "lp_price_manipulation",
+        "performance_fee"
+      ],
+      "fix": "Use TWAP for fee calculation"
+    },
+    {
+      "id": "SIG-006",
+      "name": "Cream Finance V1",
+      "date": "2021-10-27",
+      "chain": "ethereum",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 130000000,
+      "vulnerable_function": "borrow()",
+      "root_cause": "Flash loan + self-referential token pricing created infinite borrowing loop",
+      "pattern_keywords": [
+        "flash_loan",
+        "self_referential_price",
+        "infinite_borrow"
+      ],
+      "fix": "Block self-referential token as collateral"
+    },
+    {
+      "id": "SIG-007",
+      "name": "Wormhole Bridge",
+      "date": "2022-02-02",
+      "chain": "solana",
+      "attack_class": "access_control",
+      "loss_usd": 320000000,
+      "vulnerable_function": "complete_transfer()",
+      "root_cause": "Signature verification bypassed due to deprecated Solana sysvar",
+      "pattern_keywords": [
+        "signature_bypass",
+        "deprecated_sysvar",
+        "bridge_mint"
+      ],
+      "fix": "Use current verification methods; add guardian checks"
+    },
+    {
+      "id": "SIG-008",
+      "name": "Ronin Bridge",
+      "date": "2022-03-23",
+      "chain": "ethereum",
+      "attack_class": "key_compromise",
+      "loss_usd": 625000000,
+      "vulnerable_function": "withdrawERC20For()",
+      "root_cause": "5 of 9 validator keys compromised; threshold too low",
+      "pattern_keywords": [
+        "key_compromise",
+        "low_threshold",
+        "bridge_withdrawal"
+      ],
+      "fix": "Increase multisig threshold; hardware security modules"
+    },
+    {
+      "id": "SIG-009",
+      "name": "Beanstalk Governance",
+      "date": "2022-04-17",
+      "chain": "ethereum",
+      "attack_class": "governance_attack",
+      "loss_usd": 182000000,
+      "vulnerable_function": "vote() / execute()",
+      "root_cause": "Flash loan acquired governance tokens; passed malicious proposal in single tx",
+      "pattern_keywords": [
+        "flash_loan_governance",
+        "instant_execution",
+        "no_timelock"
+      ],
+      "fix": "Add timelock; snapshot voting; minimum holding period"
+    },
+    {
+      "id": "SIG-010",
+      "name": "Harmony Bridge",
+      "date": "2022-06-24",
+      "chain": "harmony",
+      "attack_class": "key_compromise",
+      "loss_usd": 100000000,
+      "vulnerable_function": "confirmTransaction()",
+      "root_cause": "2-of-5 multisig compromised; threshold critically low",
+      "pattern_keywords": [
+        "key_compromise",
+        "low_multisig",
+        "bridge"
+      ],
+      "fix": "Raise threshold to 4-of-5; add execution delay"
+    },
+    {
+      "id": "SIG-011",
+      "name": "Nomad Bridge",
+      "date": "2022-08-01",
+      "chain": "ethereum",
+      "attack_class": "logic_error",
+      "loss_usd": 190000000,
+      "vulnerable_function": "process()",
+      "root_cause": "Upgrade set trusted root to 0x00; any message became valid",
+      "pattern_keywords": [
+        "zero_root",
+        "upgrade_bug",
+        "message_replay"
+      ],
+      "fix": "Validate trusted root != zero; comprehensive upgrade testing"
+    },
+    {
+      "id": "SIG-012",
+      "name": "Wintermute",
+      "date": "2022-09-20",
+      "chain": "ethereum",
+      "attack_class": "key_compromise",
+      "loss_usd": 160000000,
+      "vulnerable_function": "N/A (EOA)",
+      "root_cause": "Vanity address generated with Profanity tool; private key derivable",
+      "pattern_keywords": [
+        "vanity_address",
+        "weak_key_generation",
+        "profanity_tool"
+      ],
+      "fix": "Never use Profanity; use secure key generation"
+    },
+    {
+      "id": "SIG-013",
+      "name": "Mango Markets",
+      "date": "2022-10-11",
+      "chain": "solana",
+      "attack_class": "oracle_manipulation",
+      "loss_usd": 114000000,
+      "vulnerable_function": "liquidate()",
+      "root_cause": "Spot price oracle manipulated with large trades; inflated collateral value",
+      "pattern_keywords": [
+        "spot_price_oracle",
+        "thin_liquidity",
+        "collateral_inflation"
+      ],
+      "fix": "Use TWAP; add price impact limits; circuit breakers"
+    },
+    {
+      "id": "SIG-014",
+      "name": "FTX/Alameda",
+      "date": "2022-11-11",
+      "chain": "multiple",
+      "attack_class": "logic_error",
+      "loss_usd": 8000000000,
+      "vulnerable_function": "N/A (centralized)",
+      "root_cause": "Commingled customer funds; no on-chain transparency",
+      "pattern_keywords": [
+        "centralized_custody",
+        "commingled_funds",
+        "no_proof_of_reserves"
+      ],
+      "fix": "On-chain proof of reserves; segregated wallets"
+    },
+    {
+      "id": "SIG-015",
+      "name": "Euler Finance",
+      "date": "2023-03-13",
+      "chain": "ethereum",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 197000000,
+      "vulnerable_function": "donateToReserves()",
+      "root_cause": "Flash loan + donate created bad debt; liquidation mechanism exploited",
+      "pattern_keywords": [
+        "flash_loan",
+        "donate_function",
+        "bad_debt",
+        "liquidation"
+      ],
+      "fix": "Add access control to donate; check health factor"
+    },
+    {
+      "id": "SIG-016",
+      "name": "Multichain Bridge",
+      "date": "2023-07-06",
+      "chain": "multiple",
+      "attack_class": "access_control",
+      "loss_usd": 126000000,
+      "vulnerable_function": "anySwapOutUnderlying()",
+      "root_cause": "MPC server compromised; admin keys controlled bridge funds",
+      "pattern_keywords": [
+        "mpc_compromise",
+        "centralized_bridge",
+        "admin_key"
+      ],
+      "fix": "Decentralize key management; add withdrawal limits"
+    },
+    {
+      "id": "SIG-017",
+      "name": "Curve Vyper Reentrancy",
+      "date": "2023-07-30",
+      "chain": "ethereum",
+      "attack_class": "reentrancy",
+      "loss_usd": 62000000,
+      "vulnerable_function": "remove_liquidity()",
+      "root_cause": "Vyper compiler bug in reentrancy lock; read-only reentrancy via callback",
+      "pattern_keywords": [
+        "vyper_bug",
+        "read_only_reentrancy",
+        "compiler_vulnerability"
+      ],
+      "fix": "Update Vyper compiler; add cross-function reentrancy guard"
+    },
+    {
+      "id": "SIG-018",
+      "name": "Stake.com",
+      "date": "2023-09-04",
+      "chain": "multiple",
+      "attack_class": "key_compromise",
+      "loss_usd": 41000000,
+      "vulnerable_function": "N/A (hot wallet)",
+      "root_cause": "Hot wallet private keys compromised",
+      "pattern_keywords": [
+        "hot_wallet_compromise",
+        "key_leak"
+      ],
+      "fix": "Cold storage; multi-layer withdrawal approval"
+    },
+    {
+      "id": "SIG-019",
+      "name": "KyberSwap Elastic",
+      "date": "2023-11-22",
+      "chain": "multiple",
+      "attack_class": "logic_error",
+      "loss_usd": 48000000,
+      "vulnerable_function": "swap()",
+      "root_cause": "Tick boundary manipulation; cross-tick swap logic flaw in concentrated liquidity",
+      "pattern_keywords": [
+        "tick_manipulation",
+        "concentrated_liquidity",
+        "cross_tick_bug"
+      ],
+      "fix": "Add tick boundary validation; comprehensive edge-case testing"
+    },
+    {
+      "id": "SIG-020",
+      "name": "Socket Gateway",
+      "date": "2024-01-16",
+      "chain": "ethereum",
+      "attack_class": "access_control",
+      "loss_usd": 3300000,
+      "vulnerable_function": "performAction()",
+      "root_cause": "New route contract had unvalidated user input; arbitrary call drained approved tokens",
+      "pattern_keywords": [
+        "arbitrary_call",
+        "unvalidated_input",
+        "approval_drain"
+      ],
+      "fix": "Whitelist call targets; validate inputs; audit new routes"
+    },
+    {
+      "id": "SIG-021",
+      "name": "Fei/Rari Fuse Reentrancy",
+      "date": "2022-04-30",
+      "chain": "ethereum",
+      "attack_class": "reentrancy",
+      "loss_usd": 80000000,
+      "vulnerable_function": "borrow()",
+      "root_cause": "Cross-contract reentrancy across Fuse pool; exitMarket callback before state update",
+      "pattern_keywords": [
+        "cross_contract_reentrancy",
+        "fuse_pool",
+        "exitMarket_callback"
+      ],
+      "fix": "Add reentrancy guard to all external-facing functions"
+    },
+    {
+      "id": "SIG-022",
+      "name": "Siren Protocol",
+      "date": "2021-09-02",
+      "chain": "ethereum",
+      "attack_class": "reentrancy",
+      "loss_usd": 3500000,
+      "vulnerable_function": "claimReward()",
+      "root_cause": "ERC-777 token callback enabled reentrancy during reward claim",
+      "pattern_keywords": [
+        "erc777_callback",
+        "token_reentrancy",
+        "reward_claim"
+      ],
+      "fix": "Use nonReentrant modifier; avoid ERC-777 hooks"
+    },
+    {
+      "id": "SIG-023",
+      "name": "DFX Finance",
+      "date": "2022-11-10",
+      "chain": "ethereum",
+      "attack_class": "reentrancy",
+      "loss_usd": 4000000,
+      "vulnerable_function": "flash()",
+      "root_cause": "Flash loan callback allowed reentrant deposit before balance check",
+      "pattern_keywords": [
+        "flash_callback_reentrancy",
+        "deposit_before_check"
+      ],
+      "fix": "Add reentrancy lock around flash functions"
+    },
+    {
+      "id": "SIG-024",
+      "name": "Platypus Finance",
+      "date": "2023-02-16",
+      "chain": "avalanche",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 8500000,
+      "vulnerable_function": "deposit() / borrow()",
+      "root_cause": "Flash loan manipulated stablecoin pool ratio; emergencyWithdraw bypassed solvency check",
+      "pattern_keywords": [
+        "flash_loan",
+        "stablecoin_ratio",
+        "emergency_withdraw_bypass"
+      ],
+      "fix": "Check solvency after emergency withdraw; add flash loan guard"
+    },
+    {
+      "id": "SIG-025",
+      "name": "DODO V2",
+      "date": "2021-03-09",
+      "chain": "ethereum",
+      "attack_class": "flash_loan_manipulation",
+      "loss_usd": 3800000,
+      "vulnerable_function": "init()",
+      "root_cause": "Flash loan re-initialized pool with attacker tokens; drained reserves",
+      "pattern_keywords": [
+        "flash_loan",
+        "reinit_attack",
+        "pool_drainage"
+      ],
+      "fix": "Prevent re-initialization; add initialized flag"
+    },
+    {
+      "id": "SIG-026",
+      "name": "Bonq Protocol",
+      "date": "2023-02-01",
+      "chain": "polygon",
+      "attack_class": "oracle_manipulation",
+      "loss_usd": 120000000,
+      "vulnerable_function": "submitValue()",
+      "root_cause": "Tellor oracle staking too low; attacker submitted false price with minimal stake",
+      "pattern_keywords": [
+        "tellor_oracle",
+        "low_stake",
+        "false_price_submission"
+      ],
+      "fix": "Require higher oracle stake; add price deviation checks"
+    },
+    {
+      "id": "SIG-027",
+      "name": "Lodestar Finance",
+      "date": "2022-12-10",
+      "chain": "arbitrum",
+      "attack_class": "oracle_manipulation",
+      "loss_usd": 6500000,
+      "vulnerable_function": "getUnderlyingPrice()",
+      "root_cause": "plvGLP oracle price manipulated; borrowed against inflated collateral",
+      "pattern_keywords": [
+        "custom_token_oracle",
+        "collateral_inflation",
+        "compound_fork"
+      ],
+      "fix": "Use established oracle; add collateral factor limits"
+    },
+    {
+      "id": "SIG-028",
+      "name": "Inverse Finance",
+      "date": "2022-06-16",
+      "chain": "ethereum",
+      "attack_class": "oracle_manipulation",
+      "loss_usd": 15600000,
+      "vulnerable_function": "getPrice()",
+      "root_cause": "Used spot SushiSwap LP price as oracle; flash loan manipulated reserves",
+      "pattern_keywords": [
+        "spot_lp_price",
+        "sushiswap_reserves",
+        "flash_manipulation"
+      ],
+      "fix": "Use Chainlink TWAP; never rely on spot DEX prices"
+    },
+    {
+      "id": "SIG-029",
+      "name": "Poly Network",
+      "date": "2021-08-10",
+      "chain": "multiple",
+      "attack_class": "access_control",
+      "loss_usd": 611000000,
+      "vulnerable_function": "executeCrossChainTx()",
+      "root_cause": "Cross-chain message could call any contract; changed keeper to attacker address",
+      "pattern_keywords": [
+        "cross_chain_call",
+        "keeper_override",
+        "unrestricted_target"
+      ],
+      "fix": "Whitelist callable contracts; separate keeper management"
+    },
+    {
+      "id": "SIG-030",
+      "name": "Qubit Finance",
+      "date": "2022-01-27",
+      "chain": "bsc",
+      "attack_class": "access_control",
+      "loss_usd": 80000000,
+      "vulnerable_function": "deposit()",
+      "root_cause": "QBridge accepted ETH deposit on BSC without actual ETH transfer; minted unbacked tokens",
+      "pattern_keywords": [
+        "cross_chain_deposit",
+        "phantom_deposit",
+        "no_transfer_validation"
+      ],
+      "fix": "Validate actual token transfer occurred before minting"
+    },
+    {
+      "id": "SIG-031",
+      "name": "Li Finance (LiFi)",
+      "date": "2022-03-20",
+      "chain": "ethereum",
+      "attack_class": "access_control",
+      "loss_usd": 600000,
+      "vulnerable_function": "swapAndBridge()",
+      "root_cause": "Arbitrary call data passed to swap function; attacker called transferFrom on approved tokens",
+      "pattern_keywords": [
+        "arbitrary_calldata",
+        "approval_exploit",
+        "unvalidated_swap"
+      ],
+      "fix": "Whitelist swap targets; validate calldata"
+    },
+    {
+      "id": "SIG-032",
+      "name": "Atomic Wallet",
+      "date": "2023-06-03",
+      "chain": "multiple",
+      "attack_class": "key_compromise",
+      "loss_usd": 35000000,
+      "vulnerable_function": "N/A (client-side)",
+      "root_cause": "Client-side key derivation vulnerability; encrypted keys extractable",
+      "pattern_keywords": [
+        "client_key_derivation",
+        "encrypted_key_extraction"
+      ],
+      "fix": "Use hardware wallet; proper key encryption at rest"
+    },
+    {
+      "id": "SIG-033",
+      "name": "CoinEx",
+      "date": "2023-09-12",
+      "chain": "multiple",
+      "attack_class": "key_compromise",
+      "loss_usd": 55000000,
+      "vulnerable_function": "N/A (hot wallet)",
+      "root_cause": "Hot wallet private keys leaked; attributed to Lazarus Group",
+      "pattern_keywords": [
+        "hot_wallet_compromise",
+        "state_actor",
+        "lazarus"
+      ],
+      "fix": "Cold storage majority; multi-approval withdrawals"
+    },
+    {
+      "id": "SIG-034",
+      "name": "BeautyChain (BEC)",
+      "date": "2018-04-22",
+      "chain": "ethereum",
+      "attack_class": "integer_overflow",
+      "loss_usd": 900000000,
+      "vulnerable_function": "batchTransfer()",
+      "root_cause": "uint256 multiplication overflow created tokens from nothing (pre-SafeMath)",
+      "pattern_keywords": [
+        "uint256_overflow",
+        "multiplication",
+        "batchTransfer",
+        "pre_safemath"
+      ],
+      "fix": "Use SafeMath or Solidity >=0.8.0 checked arithmetic"
+    },
+    {
+      "id": "SIG-035",
+      "name": "SMT Token",
+      "date": "2018-04-25",
+      "chain": "ethereum",
+      "attack_class": "integer_overflow",
+      "loss_usd": 140000000,
+      "vulnerable_function": "transferProxy()",
+      "root_cause": "Integer overflow in fee calculation; transferred max uint256 tokens",
+      "pattern_keywords": [
+        "uint256_overflow",
+        "fee_calculation",
+        "proxy_transfer"
+      ],
+      "fix": "Use SafeMath; validate fee < amount"
+    },
+    {
+      "id": "SIG-036",
+      "name": "PoWHC",
+      "date": "2018-01-28",
+      "chain": "ethereum",
+      "attack_class": "integer_overflow",
+      "loss_usd": 800000,
+      "vulnerable_function": "sell()",
+      "root_cause": "Integer underflow in balance; sold tokens without owning them",
+      "pattern_keywords": [
+        "uint256_underflow",
+        "balance_underflow",
+        "sell_without_balance"
+      ],
+      "fix": "Use SafeMath; check balance >= amount before subtraction"
+    },
+    {
+      "id": "SIG-037",
+      "name": "Compound Governance Token Distribution",
+      "date": "2021-09-30",
+      "chain": "ethereum",
+      "attack_class": "logic_error",
+      "loss_usd": 80000000,
+      "vulnerable_function": "_grantComp()",
+      "root_cause": "Proposal upgraded distributor with inverted comparison; over-distributed COMP",
+      "pattern_keywords": [
+        "governance_upgrade",
+        "inverted_comparison",
+        "over_distribution"
+      ],
+      "fix": "Comprehensive testing of upgrade proposals; staged rollout"
+    },
+    {
+      "id": "SIG-038",
+      "name": "Cover Protocol",
+      "date": "2020-12-28",
+      "chain": "ethereum",
+      "attack_class": "logic_error",
+      "loss_usd": 4000000,
+      "vulnerable_function": "mint()",
+      "root_cause": "Infinite mint via shield token deposit/withdraw loop",
+      "pattern_keywords": [
+        "infinite_mint",
+        "deposit_withdraw_loop",
+        "shield_token"
+      ],
+      "fix": "Add mint cap; validate token economics invariants"
+    },
+    {
+      "id": "SIG-039",
+      "name": "Level Finance",
+      "date": "2023-05-01",
+      "chain": "bsc",
+      "attack_class": "logic_error",
+      "loss_usd": 1100000,
+      "vulnerable_function": "claimReward()",
+      "root_cause": "Referral reward used unchecked claim counter; repeated claims drained pool",
+      "pattern_keywords": [
+        "unchecked_claim",
+        "referral_exploit",
+        "reward_drain"
+      ],
+      "fix": "Track claimed rewards per user; add claim limits"
+    },
+    {
+      "id": "SIG-040",
+      "name": "Sentiment Protocol",
+      "date": "2023-04-04",
+      "chain": "arbitrum",
+      "attack_class": "logic_error",
+      "loss_usd": 1000000,
+      "vulnerable_function": "liquidate()",
+      "root_cause": "Balancer read-only reentrancy manipulated account health during liquidation",
+      "pattern_keywords": [
+        "read_only_reentrancy",
+        "balancer_callback",
+        "health_factor"
+      ],
+      "fix": "Add reentrancy guard to view functions; cache health factor"
+    },
+    {
+      "id": "SIG-041",
+      "name": "Merlin DEX",
+      "date": "2023-04-25",
+      "chain": "zksync",
+      "attack_class": "rug_pull",
+      "loss_usd": 1800000,
+      "vulnerable_function": "emergencyWithdraw()",
+      "root_cause": "Owner drained LP via privileged emergency function despite audit",
+      "pattern_keywords": [
+        "owner_drain",
+        "emergency_withdraw",
+        "privileged_function"
+      ],
+      "fix": "Timelock on emergency functions; multi-sig required"
+    },
+    {
+      "id": "SIG-042",
+      "name": "Defrost Finance",
+      "date": "2022-12-23",
+      "chain": "avalanche",
+      "attack_class": "rug_pull",
+      "loss_usd": 12000000,
+      "vulnerable_function": "setOracle()",
+      "root_cause": "Owner changed oracle to fake one; liquidated all positions at manipulated price",
+      "pattern_keywords": [
+        "owner_oracle_change",
+        "fake_oracle",
+        "forced_liquidation"
+      ],
+      "fix": "Timelock on oracle changes; immutable oracle after launch"
+    },
+    {
+      "id": "SIG-043",
+      "name": "Compounder Finance",
+      "date": "2020-12-01",
+      "chain": "ethereum",
+      "attack_class": "rug_pull",
+      "loss_usd": 10700000,
+      "vulnerable_function": "migrate()",
+      "root_cause": "Migrate function moved all funds to owner; no timelock or governance",
+      "pattern_keywords": [
+        "migrate_drain",
+        "no_timelock",
+        "owner_only"
+      ],
+      "fix": "Remove migrate function; or add timelock + community vote"
+    },
+    {
+      "id": "SIG-044",
+      "name": "Tornado Cash Governance",
+      "date": "2023-05-20",
+      "chain": "ethereum",
+      "attack_class": "governance_attack",
+      "loss_usd": 20000000,
+      "vulnerable_function": "execute()",
+      "root_cause": "Malicious proposal hid CREATE2 contract that granted attacker 1.2M votes via selfdestruct/redeploy",
+      "pattern_keywords": [
+        "create2_disguise",
+        "hidden_selfdestruct",
+        "vote_inflation"
+      ],
+      "fix": "Review proposal code thoroughly; add proposal simulation"
+    },
+    {
+      "id": "SIG-045",
+      "name": "Build Finance DAO",
+      "date": "2022-02-09",
+      "chain": "ethereum",
+      "attack_class": "governance_attack",
+      "loss_usd": 470000,
+      "vulnerable_function": "execute()",
+      "root_cause": "Attacker acquired majority tokens cheaply; passed proposal to drain treasury",
+      "pattern_keywords": [
+        "token_accumulation",
+        "treasury_drain",
+        "low_quorum"
+      ],
+      "fix": "Higher quorum requirements; treasury spending limits per proposal"
+    },
+    {
+      "id": "SIG-046",
+      "name": "Fortress Protocol",
+      "date": "2022-05-09",
+      "chain": "bsc",
+      "attack_class": "governance_attack",
+      "loss_usd": 3000000,
+      "vulnerable_function": "submit()",
+      "root_cause": "Oracle manipulation enabled attacker to submit false collateral values via governance",
+      "pattern_keywords": [
+        "oracle_governance",
+        "collateral_manipulation",
+        "compound_fork"
+      ],
+      "fix": "Separate oracle updates from governance; add price bounds"
+    },
+    {
+      "id": "SIG-047",
+      "name": "pNetwork",
+      "date": "2021-09-19",
+      "chain": "bsc",
+      "attack_class": "cross_chain_bridge",
+      "loss_usd": 12000000,
+      "vulnerable_function": "pegOut()",
+      "root_cause": "Incorrect signature validation in cross-chain message; attacker forged withdrawal proof",
+      "pattern_keywords": [
+        "signature_forgery",
+        "cross_chain_proof",
+        "peg_out"
+      ],
+      "fix": "Multi-validator signature; add withdrawal delay"
+    },
+    {
+      "id": "SIG-048",
+      "name": "THORChain #1",
+      "date": "2021-06-28",
+      "chain": "thorchain",
+      "attack_class": "cross_chain_bridge",
+      "loss_usd": 5000000,
+      "vulnerable_function": "deposit()",
+      "root_cause": "ETH bifrost accepted fake deposit events; credited funds without actual transfer",
+      "pattern_keywords": [
+        "fake_deposit_event",
+        "event_spoofing",
+        "bifrost"
+      ],
+      "fix": "Verify actual balance change; not just events"
+    },
+    {
+      "id": "SIG-049",
+      "name": "Meter.io Bridge",
+      "date": "2022-02-05",
+      "chain": "bsc",
+      "attack_class": "cross_chain_bridge",
+      "loss_usd": 4200000,
+      "vulnerable_function": "deposit()",
+      "root_cause": "Native BNB deposits bypassed ERC20 amount check; minted excess wrapped tokens",
+      "pattern_keywords": [
+        "native_token_bypass",
+        "amount_check_skip",
+        "bridge_mint"
+      ],
+      "fix": "Separate native and ERC20 deposit paths; validate amounts"
+    },
+    {
+      "id": "SIG-050",
+      "name": "Multichain (anyCall)",
+      "date": "2022-01-18",
+      "chain": "multiple",
+      "attack_class": "cross_chain_bridge",
+      "loss_usd": 3000000,
+      "vulnerable_function": "anyExecute()",
+      "root_cause": "anyCall callback executed arbitrary function on target; no caller validation",
+      "pattern_keywords": [
+        "arbitrary_callback",
+        "no_caller_validation",
+        "cross_chain_execute"
+      ],
+      "fix": "Validate callback source; whitelist executable functions"
+    }
+  ]
+}
