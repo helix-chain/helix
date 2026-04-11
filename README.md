@@ -1,177 +1,148 @@
 # 🧬 HELIX Chain
 
-**AI-Native Smart Contract Verification & Immune Defense**
+**AI-native smart contract verification and runtime defense.**
 
-> Detect. Freeze. Immunize. Every attack makes the entire network stronger.
-
----
-
-## The Problem
-
-**$3.4 billion lost to smart contract exploits in 2025.** The same attack patterns — reentrancy, flash loans, access control failures — repeat year after year. Existing tools detect and alert. HELIX detects, halts, and builds permanent immune memory.
+HELIX detects intent-code mismatches before attackers do. Every exploit it stops becomes a permanent immune signature — protecting the entire network forever.
 
 ## How It Works
 
-HELIX uses CodeBERT (a transformer model trained on code) to create 768-dimensional vector embeddings of smart contract source code. It compares what documentation says a contract does against what the code actually does — catching mismatches that manual audits miss.
-
-Every detected attack becomes a permanent **immune signature**. Fork our code — you get zero history. **The data is the moat.**
+1. Extract developer intent from NatSpec comments & code structure
+2. Encode on-chain code behavior → 768-dim vector (CodeBERT)
+3. Compute cosine distance: high distance = high risk
+4. Match against immune library of 500 historical exploits
+5. Rule-based pattern detection with safety-aware amplification
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/helix-chain/helix.git
+git clone https://github.com/helix-chain/helix
 cd helix
 python -m venv .venv
-
 # Windows
-.venv\Scripts\activate
-
+.venv\Scripts\Activate
 # Linux/Mac
 source .venv/bin/activate
-
-pip install torch transformers numpy
+pip install torch transformers
 ```
 
-### Scan a Contract (CLI)
+### Scan a Contract
 
 ```bash
-# Scan a Solidity file
-python helix_scan.py VulnerableVault.sol
-
-# JSON output for CI/CD
-python helix_scan.py --json VulnerableVault.sol
-
-# Windows shortcut (if helix.bat is in PATH)
-helix scan VulnerableVault.sol
+python helix_scan.py scan YourContract.sol
 ```
 
-**Exit codes:** `0` = LOW/MEDIUM (safe) | `1` = HIGH/CRITICAL (block deployment) | `2` = error
-
-### Run the Detector Directly
-
-```bash
-python mismatch_detector.py
-```
-
-## Demo Output
-
-### Vulnerable Contract → CRITICAL
+### Example Output
 
 ```
-$ helix scan VulnerableVault.sol
-
-HELIX AI Security Scanner
-==========================
-File: VulnerableVault.sol
-Risk Level: CRITICAL
-Score: 0.5755
-Attack Class: reentrancy
-Evidence: external_call_before_state_update, no_reentrancy_guard
-Recommendation: Add nonReentrant modifier or use checks-effects-interactions pattern
-Exit Code: 1
+╔══════════════════════════════════════════════════════════════╗
+║                    HELIX SCAN REPORT                        ║
+╠══════════════════════════════════════════════════════════════╣
+║  File:         VulnerableVault.sol                          ║
+║  Risk Level:   CRITICAL                                     ║
+║  Score:        0.5755                                        ║
+║  Attack Class: reentrancy                                   ║
+║  Evidence:     external_call_before_state_update             ║
+║  Scan Time:    0.8s                                         ║
+╚══════════════════════════════════════════════════════════════╝
 ```
 
-### Safe Contract → LOW
+### CLI Options
 
 ```
-$ helix scan SafeToken.sol
-
-HELIX AI Security Scanner
-==========================
-File: SafeToken.sol
-Risk Level: LOW
-Score: 0.0512
-Exit Code: 0
+helix scan <file.sol> [--address 0x...] [--json]
+  --address    Attach contract address to report
+  --json       Output raw JSON format
+  Exit codes:  0 = LOW/MEDIUM, 1 = HIGH/CRITICAL, 2 = error
 ```
-
-## Verification Results
-
-| Metric | Result |
-|--------|--------|
-| **False Positive Rate** | **0%** — 104 contracts tested (100 synthetic + 4 mainnet blue-chips) |
-| **True Positive Rate** | **100%** — 42/42 detectable attack patterns identified |
-| **Blue-Chip Mainnet Test** | WETH ✅ DAI ✅ USDT ✅ USDC ✅ — all scored LOW |
-| **CLI Acceptance** | 5/5 tests passed |
 
 ## Immune Library
 
-| Stat | Value |
-|------|-------|
-| Validated Signatures | **50** |
-| Total Covered Losses | **$12.95 billion** |
-| Attack Classes | 10 (reentrancy, flash_loan, access_control, oracle_manipulation, governance, key_compromise, logic_error, integer_overflow, cross_chain, rug_pull) |
-| Data File | `immune_library_50.json` |
+| Metric | Value |
+|--------|-------|
+| Total Signatures | **500** |
+| Attack Classes | **10** |
+| Total Loss Covered | **$35.47B+** |
+| Source Types | public_postmortem (427), audit_report (33), pattern_derived (40) |
 
-Every signature is derived from a real historical exploit. The library grows with every attack discovered — creating a compounding defense that no fork can replicate.
+### Attack Class Distribution
+
+| Class | Count |
+|-------|-------|
+| flash_loan_manipulation | 65 |
+| access_control | 61 |
+| logic_error | 57 |
+| oracle_manipulation | 49 |
+| reentrancy | 47 |
+| cross_chain_bridge | 47 |
+| key_compromise | 46 |
+| governance_attack | 46 |
+| rug_pull | 42 |
+| integer_overflow | 40 |
+
+## Verification Results
+
+| Test | Result |
+|------|--------|
+| False Positive Rate | **0% (0/104)** — 100 clean contracts + 4 blue-chip mainnet (WETH/DAI/USDT/USDC) |
+| True Positive Rate | **100% (42/42)** — detectable historical attacks |
+| CLI Tests | **5/5 PASS** |
 
 ## Architecture
 
-| Layer | Name | Function |
-|-------|------|----------|
-| L3 | **NEURAL AUDIT** | Intent-code mismatch detection (CodeBERT 768-dim) |
-| L4 | **REFLEX ENGINE** | Auto-freeze high-risk transactions |
-| L6 | **MEMORY CORTEX** | Immune library (pgvector 768-dim embeddings) |
-
-### Scoring
-
 ```
-final_score = (base_embedding_score + rule_boost) × safety_amplifier
-
-Thresholds:
-  LOW      < 0.10
-  MEDIUM   < 0.30
-  HIGH     < 0.45
-  CRITICAL ≥ 0.45
+L1  Proof of Intelligence (PoI)    Miners execute AI tasks + ZKP verification
+L2  HELIX EYE                      Full observability: logs/metrics/traces/events
+L3  NEURAL AUDIT                   AI intent-code mismatch detection ← MVP
+L4  REFLEX ENGINE                  Automated low-risk + human-approved high-risk actions
+L5  PROOF GATE                     ZKP behavior certificates + graduated release gates
+L6  MEMORY CORTEX                  Immune library (attack → permanent signature → network defense) ← 500 sigs
+L7  GENESIS ENGINE                 AI proposals → dual-chamber voting → phased rollout
 ```
 
-## Phase 1 Roadmap
+## Repository Structure
 
-- [x] Intent-code mismatch detector MVP
-- [x] CLI: `helix scan <file.sol>`
-- [x] 50 immune library signatures ($12.95B coverage)
-- [x] 0% false positive rate on 104 contracts
-- [x] 42/42 true positive rate (detectable range)
-- [x] Blue-chip mainnet validation (WETH, DAI, USDT, USDC)
-- [ ] API service (REST + WebSocket)
-- [ ] Runtime monitoring with auto-freeze
-- [ ] 500 immune signatures → Phase 2 testnet
-- [ ] 3 design partner agreements
+```
+helix/
+├── mismatch_detector.py           # Core detection engine
+├── helix_scan.py                  # CLI: helix scan <file.sol>
+├── helix.bat                      # Windows CLI wrapper
+├── immune_library_500.json        # 500 attack signatures
+├── immune_library_500_sources.json # Source provenance tracking
+├── immune_library_50.json         # Legacy 50-signature library
+├── VulnerableVault.sol            # Test: CRITICAL reentrancy
+├── SafeToken.sol                  # Test: LOW (clean contract)
+├── mainnet_test_contracts.py      # Blue-chip FP test contracts
+├── mainnet_test_runner.py         # FP regression test runner
+├── mainnet_test_manifest.json     # Test configuration
+├── attack_replay_contracts.py     # Historical attack replays
+└── replay_test_runner.py          # TP regression test runner
+```
+
+## Status: Phase 1 — EVM Smart Contract AI Security Tool
+
+- [x] MVP: Intent-code mismatch detection (mismatch_detector.py)
+- [x] CLI: `helix scan <file.sol>` with JSON output
+- [x] Immune library: 500 signatures, 10 attack classes, $35.47B coverage
+- [x] FP rate: 0% (104 tests including mainnet blue-chip contracts)
+- [x] TP rate: 100% (42/42 detectable historical attacks)
+- [ ] Design partners: ≥3 (0/3)
+- [ ] Testnet deployment
 
 ## Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
-| AI Engine | Python + PyTorch + CodeBERT (HuggingFace Transformers) |
-| Immune Library | pgvector (768-dim) on PostgreSQL |
-| Future Node/Consensus | Rust |
+|-----------|------------|
+| Node/Consensus/ZKP/CLI | Rust |
+| AI Engine | Python + PyTorch (CodeBERT 768-dim) |
+| API | Axum (Rust) |
+| State Storage | PostgreSQL + pgvector |
+| Chain Storage | RocksDB |
+| Event Bus | Redis Streams |
 | ZKP Framework | Noir + Barretenberg |
 | EVM Execution | Revm |
 
-## Files
-
-| File | Description |
-|------|-------------|
-| `mismatch_detector.py` | Core detection engine |
-| `helix_scan.py` | CLI scanner |
-| `helix.bat` | Windows CLI shortcut |
-| `immune_library_50.json` | 50 validated attack signatures |
-| `SafeToken.sol` | Clean contract (test) |
-| `VulnerableVault.sol` | Vulnerable contract (test) |
-| `attack_replay_contracts.py` | Attack replay test suite |
-| `mainnet_test_contracts.py` | Blue-chip mainnet test contracts |
-| `mainnet_test_runner.py` | Mainnet FP test runner |
-| `replay_test_runner.py` | Attack replay test runner |
-
 ## Contact
 
-- **Email:** founder@helix-foundation.com
-- **Website:** [helix-foundation.com](https://helix-foundation.com)
-- **GitHub:** [github.com/helix-chain/helix](https://github.com/helix-chain/helix)
-
-## License
-
-MIT
-
----
-
-*HELIX Chain — Hybrid Evolutionary Learning & Intelligence eXecution*
+- **Email:** contact@helix-foundation.com
+- **Website:** helix-foundation.com
+- **GitHub:** github.com/helix-chain/helix
