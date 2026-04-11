@@ -1,0 +1,76 @@
+{
+  "test_suite": "B2′-b Mainnet Blue-Chip Contract FP Regression Test",
+  "version": "V1.0.01",
+  "timestamp": "202604120027",
+  "disclaimer": "Contract sources are structurally faithful representations preserving key patterns, not verbatim mainnet bytecode decompilations.",
+  "acceptance_criteria": {
+    "hard_gate": "All 4 contracts must NOT produce HIGH or CRITICAL. Any HIGH/CRITICAL = test FAIL.",
+    "soft_target": "WETH and DAI target LOW; USDC and USDT allow LOW or MEDIUM.",
+    "medium_requirement": "Any MEDIUM result must include per-function explanation (pattern name + structural noise attribution).",
+    "fail_condition": "Any HIGH/CRITICAL, OR any unexplainable pattern amplification."
+  },
+  "contracts": [
+    {
+      "name": "WETH9",
+      "mainnet_address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "source_provenance": "Canonical WETH9, widely public domain, Solidity 0.4.18",
+      "simplified": false,
+      "structural_features_preserved": [
+        "deposit() payable",
+        "withdraw() with .transfer() external call",
+        "payable fallback function",
+        "transferFrom with unlimited allowance check"
+      ],
+      "hard_gate": "NO_HIGH_CRITICAL",
+      "soft_target": "LOW",
+      "known_risk": ".transfer() triggers missing_reentrancy_guard but 2300 gas stipend makes reentrancy infeasible in practice"
+    },
+    {
+      "name": "DAI",
+      "mainnet_address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "source_provenance": "MakerDAO Multi-Collateral Dai, Solidity 0.5.12",
+      "simplified": false,
+      "structural_features_preserved": [
+        "auth modifier (wards mapping)",
+        "rely/deny governance pattern",
+        "permit (EIP-2612 gasless approval)",
+        "burn with allowance check"
+      ],
+      "hard_gate": "NO_HIGH_CRITICAL",
+      "soft_target": "LOW",
+      "known_risk": "None expected — no external calls in any function"
+    },
+    {
+      "name": "USDT",
+      "mainnet_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "source_provenance": "Tether TetherToken, legacy Solidity 0.4.17",
+      "simplified": false,
+      "structural_features_preserved": [
+        "Ownable + Pausable inheritance",
+        "Fee mechanism (basisPointsRate)",
+        "Blacklist system",
+        "Issue/redeem supply management",
+        "Legacy Solidity style (no SafeMath, pre-0.8)"
+      ],
+      "hard_gate": "NO_HIGH_CRITICAL",
+      "soft_target": "LOW_OR_MEDIUM",
+      "known_risk": "Legacy style may cause structural noise; no external calls expected to trigger patterns"
+    },
+    {
+      "name": "USDC",
+      "mainnet_address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "source_provenance": "Circle FiatTokenV2_2, Solidity 0.6.12, implementation behind proxy",
+      "simplified": false,
+      "structural_features_preserved": [
+        "Proxy/implementation pattern (initialize())",
+        "Role-based access (owner, pauser, blacklister, masterMinter)",
+        "Multi-modifier stacking (whenNotPaused + notBlacklisted + onlyMinters)",
+        "configureMinter with allowance",
+        "Blacklist + pause system"
+      ],
+      "hard_gate": "NO_HIGH_CRITICAL",
+      "soft_target": "LOW_OR_MEDIUM",
+      "known_risk": "Complex role management and many public functions may create moderate embedding distance; no external calls"
+    }
+  ]
+}
