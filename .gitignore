@@ -4,3 +4,12 @@ __pycache__/
 .env
 *.key
 node_modules/
+
+# Test artifacts
+fp_test_report_*.json
+replay_test_report_*.json
+mainnet_test_log.json
+*_backup.py
+patch_*.py
+clean_contracts_*.py
+fp_test_runner.py
