@@ -1,0 +1,3553 @@
+{
+  "version": "1.0_202604120804",
+  "generated": "2026-04-12T08:04:00+09:00",
+  "description": "Source provenance tracking for HELIX Immune Library 500 signatures",
+  "total_sources": 500,
+  "source_type_summary": {
+    "public_postmortem": 427,
+    "audit_report": 33,
+    "pattern_derived": 40
+  },
+  "sources": [
+    {
+      "id": "SIG-001",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for The DAO Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-002",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Parity Multisig Freeze",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-003",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for bZx Flash Loan",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-004",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Harvest Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-005",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for PancakeBunny",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-006",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Cream Finance V1",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-007",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Wormhole Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-008",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Ronin Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-009",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Beanstalk Governance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-010",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Harmony Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-011",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Nomad Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-012",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Wintermute",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-013",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Mango Markets",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-014",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for FTX/Alameda",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-015",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Euler Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-016",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Multichain Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-017",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Curve Vyper Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-018",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Stake.com",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-019",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for KyberSwap Elastic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-020",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Socket Gateway",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-021",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Fei/Rari Fuse Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-022",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Siren Protocol",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-023",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for DFX Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-024",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Platypus Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-025",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for DODO V2",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-026",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Bonq Protocol",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-027",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Lodestar Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-028",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Inverse Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-029",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Poly Network",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-030",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Qubit Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-031",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Li Finance (LiFi)",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-032",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Atomic Wallet",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-033",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for CoinEx",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-034",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for BeautyChain (BEC)",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-035",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for SMT Token",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-036",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for PoWHC",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-037",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Compound Governance Token Distribution",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-038",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Cover Protocol",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-039",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Level Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-040",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Sentiment Protocol",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-041",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Merlin DEX",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-042",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Defrost Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-043",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Compounder Finance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-044",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Tornado Cash Governance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-045",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Build Finance DAO",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-046",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Fortress Protocol",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-047",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for pNetwork",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-048",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for THORChain #1",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-049",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Meter.io Bridge",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-050",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem for Multichain (anyCall)",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-051",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Harvest Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-052",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Alpha Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-053",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Warp Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-054",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Spartan Protocol - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-055",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: ValueDeFi - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-056",
+      "source_type": "public_postmortem",
+      "reference": "SlowMist: Cheese Bank Analysis",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-057",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Belt Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-058",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Uranium Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-059",
+      "source_type": "public_postmortem",
+      "reference": "BlockSec: ApeRocket Flash Loan Analysis",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-060",
+      "source_type": "public_postmortem",
+      "reference": "1inch Blog: Balancer Pool Vulnerability",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-061",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Platypus Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-062",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Yearn v1 yDAI - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-063",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Poly Network - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-064",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Wormhole - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-065",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Wintermute - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-066",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Badger DAO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-067",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: dForce - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-068",
+      "source_type": "public_postmortem",
+      "reference": "Compound Blog: COMP Distribution Issue",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-069",
+      "source_type": "public_postmortem",
+      "reference": "Parity Technologies Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-070",
+      "source_type": "public_postmortem",
+      "reference": "CertiK: Cashio Infinite Mint Analysis",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-071",
+      "source_type": "public_postmortem",
+      "reference": "BlockSec: Level Finance Referral Exploit",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-072",
+      "source_type": "audit_report",
+      "reference": "OpenZeppelin: UUPS Proxy Vulnerability Advisory",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-073",
+      "source_type": "public_postmortem",
+      "reference": "Socket Tech: Post-Mortem January 2024",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-074",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Cream Finance - REKT 2",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-075",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Rari Capital / Fei - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-076",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Eminence Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-077",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Revest Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-078",
+      "source_type": "public_postmortem",
+      "reference": "DFX Finance Official Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-079",
+      "source_type": "audit_report",
+      "reference": "ChainSecurity: Read-Only Reentrancy Research Paper",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-080",
+      "source_type": "public_postmortem",
+      "reference": "Sentiment Protocol Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-081",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Grim Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-082",
+      "source_type": "audit_report",
+      "reference": "Jarvis Network: Reentrancy Vulnerability Disclosure",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-083",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Vyper Compiler / Curve - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-084",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Cover Protocol - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-085",
+      "source_type": "audit_report",
+      "reference": "OpenZeppelin: ERC4626 Inflation Attack Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-086",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Indexed Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-087",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: MonoX Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-088",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Hundred Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-089",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Team Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-090",
+      "source_type": "audit_report",
+      "reference": "Beanstalk Farms: Seigniorage Bug Disclosure",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-091",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Saddle Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-092",
+      "source_type": "public_postmortem",
+      "reference": "Multichain: anyCall Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-093",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Euler Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-094",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: BonqDAO - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-095",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Inverse Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-096",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Rari Capital - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-097",
+      "source_type": "public_postmortem",
+      "reference": "Fortress Protocol: Incident Report",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-098",
+      "source_type": "public_postmortem",
+      "reference": "BonqDAO: Second Attack Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-099",
+      "source_type": "public_postmortem",
+      "reference": "Venus Protocol: BTC Oracle Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-100",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Lodestar Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-101",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Mango Markets - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-102",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Aave CRV Short - Near REKT",
+      "tx_hash_status": "verified",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-103",
+      "source_type": "public_postmortem",
+      "reference": "Ronin Network: Community Alert on Validator Compromise",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-104",
+      "source_type": "public_postmortem",
+      "reference": "Harmony: Horizon Bridge Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-105",
+      "source_type": "public_postmortem",
+      "reference": "Atomic Wallet: Security Incident Report June 2023",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-106",
+      "source_type": "public_postmortem",
+      "reference": "Stake.com Official Statement September 2023",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-107",
+      "source_type": "public_postmortem",
+      "reference": "CoinEx: Official Incident Response",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-108",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Multichain - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-109",
+      "source_type": "public_postmortem",
+      "reference": "BitMart CEO Statement December 2021",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-110",
+      "source_type": "public_postmortem",
+      "reference": "HTX/Heco: Joint Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-111",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Qubit Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-112",
+      "source_type": "public_postmortem",
+      "reference": "Meter Network: Bridge Exploit Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-113",
+      "source_type": "public_postmortem",
+      "reference": "pNetwork: pBTC Incident Report",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-114",
+      "source_type": "public_postmortem",
+      "reference": "THORChain: July 2021 Incident Report",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-115",
+      "source_type": "public_postmortem",
+      "reference": "THORChain: June 2021 Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-116",
+      "source_type": "public_postmortem",
+      "reference": "Li.Finance: Security Incident Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-117",
+      "source_type": "public_postmortem",
+      "reference": "Orbit Chain: January 2024 Security Incident",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-118",
+      "source_type": "public_postmortem",
+      "reference": "Socket Tech: Route Vulnerability Report",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-119",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Tornado Cash Governance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-120",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Beanstalk - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-121",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Build Finance DAO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-122",
+      "source_type": "public_postmortem",
+      "reference": "Audius: Governance Vulnerability Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-123",
+      "source_type": "public_postmortem",
+      "reference": "Compound: Proposal 117 Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-124",
+      "source_type": "public_postmortem",
+      "reference": "Swerve Finance: Community Governance Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-125",
+      "source_type": "public_postmortem",
+      "reference": "CertiK: Atlantis Loans Governance Attack Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-126",
+      "source_type": "audit_report",
+      "reference": "True Seigniorage Dollar: Community Disclosure",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-127",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: AnubisDAO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-128",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Meerkat Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-129",
+      "source_type": "public_postmortem",
+      "reference": "BBC News: Squid Game cryptocurrency collapses",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-130",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Compounder Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-131",
+      "source_type": "public_postmortem",
+      "reference": "SlowMist: StableMagnet Rug Pull Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-132",
+      "source_type": "public_postmortem",
+      "reference": "CertiK: Merlin DEX Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-133",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Magnate Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-134",
+      "source_type": "public_postmortem",
+      "reference": "PeckShield: BEC Token batchOverflow Alert",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-135",
+      "source_type": "public_postmortem",
+      "reference": "PeckShield: SMT Token proxyOverflow Alert",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-136",
+      "source_type": "public_postmortem",
+      "reference": "Community: PoWHC Exploit Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-137",
+      "source_type": "audit_report",
+      "reference": "Tether: Responsible Disclosure Report",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-138",
+      "source_type": "public_postmortem",
+      "reference": "Immunefi: Poolz Finance Overflow Bug Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-139",
+      "source_type": "public_postmortem",
+      "reference": "SushiSwap: MISO Supply Chain Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-140",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Punk Protocol - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-141",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: PancakeBunny - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-142",
+      "source_type": "public_postmortem",
+      "reference": "BlockSec: AutoShark Finance Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-143",
+      "source_type": "public_postmortem",
+      "reference": "Merlin Labs: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-144",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: bEarn Fi - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-145",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: xToken - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-146",
+      "source_type": "public_postmortem",
+      "reference": "Rari Capital: Pool 26 Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-147",
+      "source_type": "public_postmortem",
+      "reference": "ElevenFinance: Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-148",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Cream Finance V2 - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-149",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Beanstalk - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-150",
+      "source_type": "public_postmortem",
+      "reference": "Bogged Finance: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-151",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Visor Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-152",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: KyberSwap - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-153",
+      "source_type": "public_postmortem",
+      "reference": "Nexus Mutual: CEO Wallet Attack Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-154",
+      "source_type": "public_postmortem",
+      "reference": "Vulcan Forged: Official Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-155",
+      "source_type": "public_postmortem",
+      "reference": "Transit Finance: Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-156",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: MonoX - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-157",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Furucombo - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-158",
+      "source_type": "public_postmortem",
+      "reference": "Treasure DAO: Marketplace Bug Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-159",
+      "source_type": "public_postmortem",
+      "reference": "Multichain: anySwap V4 Security Notice",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-160",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: BonqDAO - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-161",
+      "source_type": "audit_report",
+      "reference": "Yearn Finance: Security Disclosure Feb 2021",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-162",
+      "source_type": "public_postmortem",
+      "reference": "SushiSwap: MISO Supply Chain Attack Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-163",
+      "source_type": "public_postmortem",
+      "reference": "Ankr: aBNBc Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-164",
+      "source_type": "audit_report",
+      "reference": "Compound: TUSD Integration Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-165",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Deus Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-166",
+      "source_type": "public_postmortem",
+      "reference": "Conic Finance: Post-Mortem July 2023",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-167",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: LendHub - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-168",
+      "source_type": "audit_report",
+      "reference": "Balancer: Boosted Pool Rate Provider Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-169",
+      "source_type": "public_postmortem",
+      "reference": "Hope Finance: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-170",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Jimbo Protocol - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-171",
+      "source_type": "public_postmortem",
+      "reference": "Sentiment Protocol: Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-172",
+      "source_type": "audit_report",
+      "reference": "Tornado Cash: Fee Bug Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-173",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Exactly Protocol - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-174",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Harvest Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-175",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Warp Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-176",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Beanstalk - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-177",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Aave CRV Short - Near REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-178",
+      "source_type": "public_postmortem",
+      "reference": "PeckShield: UVT Token Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-179",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Zunami Protocol - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-180",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: DODO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-181",
+      "source_type": "public_postmortem",
+      "reference": "EraLend: Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-182",
+      "source_type": "public_postmortem",
+      "reference": "Rodeo Finance: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-183",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Euler Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-184",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Alphapo - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-185",
+      "source_type": "public_postmortem",
+      "reference": "Poloniex: Official Security Incident Statement",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-186",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Mixin Network - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-187",
+      "source_type": "public_postmortem",
+      "reference": "deBridge: Attempted Attack Disclosure",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-188",
+      "source_type": "public_postmortem",
+      "reference": "Coins.ph: Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-189",
+      "source_type": "public_postmortem",
+      "reference": "Orbit Chain: January 2024 Incident",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-190",
+      "source_type": "public_postmortem",
+      "reference": "WazirX: Post-Mortem July 2024",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-191",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Nomad Bridge - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-192",
+      "source_type": "public_postmortem",
+      "reference": "Poly Network: Second Attack Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-193",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Multichain - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-194",
+      "source_type": "public_postmortem",
+      "reference": "Celer Network: DNS Hijacking Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-195",
+      "source_type": "public_postmortem",
+      "reference": "Allbridge: Bridge Exploit Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-196",
+      "source_type": "public_postmortem",
+      "reference": "Rubic: Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-197",
+      "source_type": "audit_report",
+      "reference": "Axelar: Responsible Disclosure Report",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-198",
+      "source_type": "audit_report",
+      "reference": "Across Protocol: V2 Fill Bug Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-199",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Beanstalk - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-200",
+      "source_type": "public_postmortem",
+      "reference": "Rari Capital: Tribe DAO Dissolution Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-201",
+      "source_type": "public_postmortem",
+      "reference": "PAID Network: Minting Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-202",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Indexed Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-203",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Mochi Protocol - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-204",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Wonderland - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-205",
+      "source_type": "public_postmortem",
+      "reference": "Fortress Protocol: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-206",
+      "source_type": "public_postmortem",
+      "reference": "CoinDesk: Aragon DAO Dissolution Coverage",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-207",
+      "source_type": "public_postmortem",
+      "reference": "Reuters: Thodex Exchange CEO Arrest",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-208",
+      "source_type": "public_postmortem",
+      "reference": "DOJ: OneCoin Fraud Prosecution",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-209",
+      "source_type": "public_postmortem",
+      "reference": "BSC Community: FineCrypto Rug Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-210",
+      "source_type": "public_postmortem",
+      "reference": "DOJ: Frosties NFT Fraud Charges",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-211",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Kokomo Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-212",
+      "source_type": "public_postmortem",
+      "reference": "DeFi Safety: DeFi100 Rug Pull Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-213",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Luna Yield - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-214",
+      "source_type": "audit_report",
+      "reference": "Trail of Bits: ERC-20 Overflow Patterns",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-215",
+      "source_type": "audit_report",
+      "reference": "PeckShield: MESH Token Approval Overflow",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-216",
+      "source_type": "audit_report",
+      "reference": "ICON Foundation: Security Audit Disclosure",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-217",
+      "source_type": "public_postmortem",
+      "reference": "PeckShield: batchOverflow Copycat Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-218",
+      "source_type": "public_postmortem",
+      "reference": "PeckShield: Mass Overflow Wave Report April 2018",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-219",
+      "source_type": "public_postmortem",
+      "reference": "YAM Finance: Rebase Bug Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-220",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Uranium Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-221",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Rari Capital / Fei - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-222",
+      "source_type": "audit_report",
+      "reference": "OpenZeppelin: ERC-1155 Reentrancy Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-223",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Cream Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-224",
+      "source_type": "public_postmortem",
+      "reference": "Aave: V1 Flash Loan Security Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-225",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Omni Protocol - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-226",
+      "source_type": "public_postmortem",
+      "reference": "Paraluni: AMM Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-227",
+      "source_type": "public_postmortem",
+      "reference": "Bacon Protocol: Withdrawal Bug Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-228",
+      "source_type": "public_postmortem",
+      "reference": "Sturdy Finance: Post-Mortem June 2023",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-229",
+      "source_type": "public_postmortem",
+      "reference": "Earning.Farm: Exploit Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-230",
+      "source_type": "public_postmortem",
+      "reference": "bZx/dYdX: February 2020 Flash Loan Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-231",
+      "source_type": "public_postmortem",
+      "reference": "PancakeHunny: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-232",
+      "source_type": "public_postmortem",
+      "reference": "BlockSec: BurgerSwap Attack Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-233",
+      "source_type": "public_postmortem",
+      "reference": "PolyYeld: Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-234",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Saddle Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-235",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Deus Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-236",
+      "source_type": "public_postmortem",
+      "reference": "New Free DAO: Attack Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-237",
+      "source_type": "public_postmortem",
+      "reference": "Dexible: Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-238",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Defrost Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-239",
+      "source_type": "public_postmortem",
+      "reference": "Raydium: AMM Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-240",
+      "source_type": "public_postmortem",
+      "reference": "Platypus: V2 Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-241",
+      "source_type": "public_postmortem",
+      "reference": "Nirvana Finance: Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-242",
+      "source_type": "public_postmortem",
+      "reference": "Transit Finance: Second Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-243",
+      "source_type": "public_postmortem",
+      "reference": "Uranium Finance: Admin Key Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-244",
+      "source_type": "public_postmortem",
+      "reference": "Multichain: Fantom Bridge Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-245",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Safemoon - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-246",
+      "source_type": "public_postmortem",
+      "reference": "OlympusDAO: Bond Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-247",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Team Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-248",
+      "source_type": "public_postmortem",
+      "reference": "SushiSwap: RouteProcessor2 Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-249",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Euler Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-250",
+      "source_type": "public_postmortem",
+      "reference": "Ledger: Connect Kit Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-251",
+      "source_type": "public_postmortem",
+      "reference": "KuCoin: Official Incident Statement",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-252",
+      "source_type": "audit_report",
+      "reference": "EigenLayer: Withdrawal Bug Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-253",
+      "source_type": "public_postmortem",
+      "reference": "DeFiPie: Access Control Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-254",
+      "source_type": "public_postmortem",
+      "reference": "Yearn Finance: V2 Strategy Bug Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-255",
+      "source_type": "public_postmortem",
+      "reference": "PancakeBunny: Polygon V2 Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-256",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Popsicle Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-257",
+      "source_type": "audit_report",
+      "reference": "Thoreum Finance: Dividend Bug Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-258",
+      "source_type": "public_postmortem",
+      "reference": "BlockSec: Level Finance Exploit",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-259",
+      "source_type": "public_postmortem",
+      "reference": "Arcadia Finance: Post-Mortem",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-260",
+      "source_type": "public_postmortem",
+      "reference": "Steadefi: Rebalance Bug Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-261",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Zunami Protocol - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-262",
+      "source_type": "audit_report",
+      "reference": "Astrid Finance: Withdrawal Bug Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-263",
+      "source_type": "public_postmortem",
+      "reference": "Raft: Mint/Burn Precision Bug Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-264",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Visor Finance - REKT",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-265",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: ValueDeFi - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-266",
+      "source_type": "public_postmortem",
+      "reference": "SlowMist: Cheese Bank Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-267",
+      "source_type": "public_postmortem",
+      "reference": "Origin Protocol: OUSD Post-Mortem",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-268",
+      "source_type": "public_postmortem",
+      "reference": "Hundred Finance: Gnosis Chain Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-269",
+      "source_type": "audit_report",
+      "reference": "Themis Protocol: Oracle Advisory",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-270",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: DODO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-271",
+      "source_type": "audit_report",
+      "reference": "Gyroscope: Oracle Manipulation Research",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-272",
+      "source_type": "public_postmortem",
+      "reference": "Silo Finance: Oracle Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-273",
+      "source_type": "public_postmortem",
+      "reference": "Crypto.com: Incident Response January 2022",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-274",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Slope Wallet - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-275",
+      "source_type": "public_postmortem",
+      "reference": "Liquid Exchange: Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-276",
+      "source_type": "public_postmortem",
+      "reference": "Transit Finance: Key Leak Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-277",
+      "source_type": "public_postmortem",
+      "reference": "1inch: Profanity Vulnerability Disclosure",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-278",
+      "source_type": "public_postmortem",
+      "reference": "Ascend Exchange: Key Leak Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-279",
+      "source_type": "public_postmortem",
+      "reference": "AscendEX: Official Incident Statement",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-280",
+      "source_type": "public_postmortem",
+      "reference": "Kronos Research: Security Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-281",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Wormhole - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-282",
+      "source_type": "public_postmortem",
+      "reference": "Ronin Network: Validator Compromise Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-283",
+      "source_type": "public_postmortem",
+      "reference": "BNB Chain: Token Hub Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-284",
+      "source_type": "public_postmortem",
+      "reference": "Harmony: Horizon Bridge Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-285",
+      "source_type": "public_postmortem",
+      "reference": "Hector Network: Bridge Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-286",
+      "source_type": "public_postmortem",
+      "reference": "Chainswap: Bridge Exploit Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-287",
+      "source_type": "public_postmortem",
+      "reference": "Poly Network: Second Attack Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-288",
+      "source_type": "public_postmortem",
+      "reference": "Socket Tech: Gateway V2 Report",
+      "tx_hash_status": "verified",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-289",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Tornado Cash Governance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-290",
+      "source_type": "audit_report",
+      "reference": "Balancer: Governance Concentration Risk Report",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-291",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Beanstalk - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-292",
+      "source_type": "public_postmortem",
+      "reference": "Onyx Protocol: Governance Exploit Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-293",
+      "source_type": "public_postmortem",
+      "reference": "Tornado Cash: Proposal 21 Recovery Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-294",
+      "source_type": "public_postmortem",
+      "reference": "CertiK: Atlantis Loans Governance Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-295",
+      "source_type": "public_postmortem",
+      "reference": "Merit Circle: DAO Governance Dispute Coverage",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-296",
+      "source_type": "public_postmortem",
+      "reference": "Ark Finance: Token Mint Proposal Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-297",
+      "source_type": "public_postmortem",
+      "reference": "DOJ: Bitconnect Prosecution Filing",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-298",
+      "source_type": "public_postmortem",
+      "reference": "Coffeezilla: SaveTheKids Investigation",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-299",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: SnowDog - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-300",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Arbix Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-301",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Swaprum - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-302",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Bald Token - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-303",
+      "source_type": "public_postmortem",
+      "reference": "CertiK: Harvest Keeper AI Rug Analysis",
+      "tx_hash_status": "multiple",
+      "confidence": "medium"
+    },
+    {
+      "id": "SIG-304",
+      "source_type": "audit_report",
+      "reference": "Tether: Responsible Disclosure Report",
+      "tx_hash_status": "unavailable",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-305",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: MonoX Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-306",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Akropolis - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-307",
+      "source_type": "public_postmortem",
+      "reference": "PAID Network: Minting Incident Report",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-308",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: DODO - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-309",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Superfluid - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-310",
+      "source_type": "public_postmortem",
+      "reference": "Rekt News: Ola Finance - REKT",
+      "tx_hash_status": "multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-311",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-085 (Compound cToken) and SIG-088 (Hundred Finance)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-085"
+    },
+    {
+      "id": "SIG-312",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-079 (Read-Only Reentrancy) and SIG-228 (Sturdy Finance)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-079"
+    },
+    {
+      "id": "SIG-313",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-067 (dForce imBTC) and SIG-074 (Cream AMP)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-067"
+    },
+    {
+      "id": "SIG-314",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-085 (Compound cToken) and SIG-088 (Hundred Finance)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-085"
+    },
+    {
+      "id": "SIG-315",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-191 (Nomad Bridge) and SIG-111 (Qubit)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-191"
+    },
+    {
+      "id": "SIG-316",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-128 (Meerkat) and SIG-211 (Kokomo)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-128"
+    },
+    {
+      "id": "SIG-317",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-127 (AnubisDAO) and SIG-129 (Squid Game)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-127"
+    },
+    {
+      "id": "SIG-318",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-120 (Beanstalk) and SIG-199 (Beanstalk Emergency)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-120"
+    },
+    {
+      "id": "SIG-319",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-095 (Inverse Finance) and SIG-266 (Cheese Bank)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-095"
+    },
+    {
+      "id": "SIG-320",
+      "source_type": "pattern_derived",
+      "reference": "Derived from SIG-134 (BEC Token) and SIG-135 (SMT Token)",
+      "tx_hash_status": "unavailable",
+      "confidence": "medium",
+      "derived_from": "SIG-134"
+    },
+    {
+      "id": "SIG-321",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Platypus Finance AVAX Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-322",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Balancer V2 Flash Loan Rate Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-323",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for DeFiPie Flash Loan Liquidation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-324",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Yearn V2 Vault Flash Manipulation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-325",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for SushiSwap Kashi Flash Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-326",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for WOOFi Swap Price Manipulation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-327",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for ParaSpace NFT Flash Loan Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-328",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Hundred Finance Optimism Exploit",
+      "tx_hash_status": "verified_onchain",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-329",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Sentiment Protocol Flash Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-330",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Deus Finance May Flash Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-331",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Level Finance Referral Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-332",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Atlantis Loans Governance Takeover",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-333",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Sturdy Finance Oracle Access Exploit",
+      "tx_hash_status": "verified_onchain",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-334",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Libertify Vault Approval Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-335",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for THORChain Router Exploit V3",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-336",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Zunami Protocol Admin Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-337",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for CoinEx Hot Wallet Compromise",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-338",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Hashflow Quote Validation Bypass",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-339",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Stars Arena Fund Extraction",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-340",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Maestro Router Approval Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-341",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Curve.fi Vyper Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-342",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for EraLend Reentrancy Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-343",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Protocol Ungoverned Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-344",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Conic Finance Reentrancy",
+      "tx_hash_status": "verified_onchain",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-345",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for SteadyFi Vault Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-346",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Themis Protocol Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-347",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Abracadabra Degenbox Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-348",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Revest Finance FNFT Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-349",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for NFT Trader Reentrancy Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-350",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Multichain anySwap Router Bug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-351",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Exactly Protocol Market Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-352",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Earning.Farm Withdrawal Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-353",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Socket Gateway Validation Gap",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-354",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Unizen DEX Aggregator Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-355",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Pike Finance USDC Logic Flaw",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-356",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Prisma Finance Fee Distribution Bug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-357",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Munchables Proxy Logic Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-358",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Hedgey Finance Token Claim",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-359",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for BonqDAO ALBT Oracle Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-360",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Lodestar Finance Oracle Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-361",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Agave Lending GNO Oracle",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-362",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Aave V3 CRV Price Exploit Attempt",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-363",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Jimbo Protocol TWAP Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-364",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Mango Markets V4 Oracle Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-365",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Inverse Finance DOLA Oracle Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-366",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Venus Protocol BNB Bridge Oracle",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-367",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Onyx Protocol CToken Oracle",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-368",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Stake.com Hot Wallet Breach",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-369",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Alphapo Payment Processor Hack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-370",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Atomic Wallet Key Extraction",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-371",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Mixin Network Key Server Breach",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-372",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for HTX/Heco Bridge Key Leak",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-373",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Orbit Chain Bridge Key Compromise",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-374",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Poloniex Exchange Hot Wallet",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-375",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for LastPass Crypto Wallet Drains",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-376",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for KyberSwap Aggregator Key Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-377",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Hector Network Bridge Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-378",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Multichain Executor Vulnerability",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-379",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Socket Bridge Route Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-380",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Synapse Bridge AMM Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-381",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Thorchain ETH Router Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-382",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Poly Network Executor Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-383",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Celer cBridge Message Spoof",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-384",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Allbridge LP Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-385",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Chainport Bridge Token Mint",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-386",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Tornado Cash Governance Takeover",
+      "tx_hash_status": "verified_onchain",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-387",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Aragon DAO Treasury Raid",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-388",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Beanstalk Flashloan Governance",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-389",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Build Finance DAO Takeover",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-390",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Swerve Finance Governance Deadlock",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-391",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Merit Circle DAO Investor Dispute",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-392",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Compound Governance Bug 2023",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-393",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Rari Capital DAO Shutdown Vote",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-394",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Lido stETH Governance Oracle Risk",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-395",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Magnate Finance Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-396",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for SwirlLend Multichain Rug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-397",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Ordinals Finance Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-398",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for DeFiLabs BSC Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-399",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for LunaFi Vault Exit Scam",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-400",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Fake WLD Token Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-401",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Harvest Keeper Bot Rug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-402",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Nova Token BSC Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-403",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for SushiSwap MasterChef V2 Overflow",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-404",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for GMX Precision Loss Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-405",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Arcade.xyz Rounding Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-406",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for JPEG'd pETH Precision Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-407",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Vyper uint256 Compiler Truncation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-408",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Gain Protocol Fee Overflow",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-409",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Asymmetry SafEth Share Calculation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-410",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Radiant Capital V2 Rounding",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-411",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Radiant Capital Flash Borrow",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-412",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Gamma Strategies Flash Deposit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-413",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Wise Lending Flash Pool Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-414",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Blueberry Protocol Flash Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-415",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Shido DEX Flash Arbitrage Attack",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-416",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Seneca Protocol stablecoin Flash",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-417",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Moby Trade Flash Vault Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-418",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Compound Fork Flash Liquidation Pattern",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-419",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Socket V2 Approval Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-420",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Concentric.fi Manager Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-421",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Playdapp PLA Token Mint",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-422",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Abracadabra MIM Approval Bug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-423",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for NFPrompt Admin Key Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-424",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for BarleyFinance Proxy Upgrade",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-425",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Mozaic Finance Bridged Token Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-426",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Prisma Finance Migrator Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-427",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Raft Protocol R Token Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-428",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Pine Protocol NFT Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-429",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Clober DEX Order Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-430",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for DistributedTown Staking Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-431",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for DefiEdge Uniswap V3 Callback Reentry",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-432",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for PariFi Perpetual Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-433",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for MetaStreet V2 Reentrancy",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-434",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for ERC-2771 Context Reentrancy Pattern",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-435",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Particle Protocol NFT Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-436",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Telcoin Proxy Initialization",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-437",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Goledo Finance Liquidation Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-438",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Convergence Finance Reward Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-439",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Uwulend Position Calculation Error",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-440",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Normie Token Rebase Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-441",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Lykke Exchange Withdrawal Logic",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-442",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for OKX DEX Oracle Spoof",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-443",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Channels Finance LP Oracle",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-444",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for DForce Lending Oracle Stale Feed",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-445",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Mean Finance TWAP Window Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-446",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Minterest Protocol Oracle Lag",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-447",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Somesing Platform Key Breach",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-448",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Ripple Co-founder XRP Theft",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-449",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for FixedFloat Exchange Breach",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-450",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for WazirX Exchange Multisig Compromise",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-451",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Chris Larsen Personal Wallet Drain",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-452",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Pike Finance Cross-Chain Spoof",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-453",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Alex Lab BTC Bridge Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-454",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for XBridge Relay Validation Gap",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-455",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Wormhole VAA Verification Bypass",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-456",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for LayerZero Endpoint Config Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-457",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Compound Governance Proposal 117",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-458",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for TrueUSD Governance Key Rotation Failure",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-459",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Nostra Finance Parameter Manipulation",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-460",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Arcade.xyz DAO Treasury Misuse",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-461",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Indexed Finance Governance Delay Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-462",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for BitForex Exchange Exit Scam",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-463",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for RiskOnBlast Presale Rug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-464",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Gemholic zkSync Rug Pull",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-465",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for Mango Farm SOL Rug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-466",
+      "source_type": "public_postmortem",
+      "reference": "Public postmortem / audit report for NexFundAI Token Rug",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-467",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Sonne Finance Precision Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-468",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for DeltaPrime Precision Rounding",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-469",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Venus Protocol vBNB Share Exploit",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-470",
+      "source_type": "audit_report",
+      "reference": "Public postmortem / audit report for Dolomite Margin Precision Loss",
+      "tx_hash_status": "verified_multiple",
+      "confidence": "high"
+    },
+    {
+      "id": "SIG-471",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-051 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-051"
+    },
+    {
+      "id": "SIG-472",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-051 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-051"
+    },
+    {
+      "id": "SIG-473",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-058 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-058"
+    },
+    {
+      "id": "SIG-474",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-058 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-058"
+    },
+    {
+      "id": "SIG-475",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-001 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-001"
+    },
+    {
+      "id": "SIG-476",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-001 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-001"
+    },
+    {
+      "id": "SIG-477",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-046 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-046"
+    },
+    {
+      "id": "SIG-478",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-046 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-046"
+    },
+    {
+      "id": "SIG-479",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-008 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-008"
+    },
+    {
+      "id": "SIG-480",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-008 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-008"
+    },
+    {
+      "id": "SIG-481",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-037 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-037"
+    },
+    {
+      "id": "SIG-482",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-037 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-037"
+    },
+    {
+      "id": "SIG-483",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-386 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-386"
+    },
+    {
+      "id": "SIG-484",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-386 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-386"
+    },
+    {
+      "id": "SIG-485",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-395 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-395"
+    },
+    {
+      "id": "SIG-486",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-395 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-395"
+    },
+    {
+      "id": "SIG-487",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-368 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-368"
+    },
+    {
+      "id": "SIG-488",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-368 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-368"
+    },
+    {
+      "id": "SIG-489",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-350 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-350"
+    },
+    {
+      "id": "SIG-490",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-350 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-350"
+    },
+    {
+      "id": "SIG-491",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-051 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-051"
+    },
+    {
+      "id": "SIG-492",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-058 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-058"
+    },
+    {
+      "id": "SIG-493",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-001 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-001"
+    },
+    {
+      "id": "SIG-494",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-395 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-395"
+    },
+    {
+      "id": "SIG-495",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-008 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-008"
+    },
+    {
+      "id": "SIG-496",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-037 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-037"
+    },
+    {
+      "id": "SIG-497",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-386 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-386"
+    },
+    {
+      "id": "SIG-498",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-046 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-046"
+    },
+    {
+      "id": "SIG-499",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-350 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-350"
+    },
+    {
+      "id": "SIG-500",
+      "source_type": "pattern_derived",
+      "reference": "Pattern derived from SIG-037 and related incidents",
+      "tx_hash_status": "not_applicable",
+      "confidence": "medium",
+      "derived_from": "SIG-037"
+    }
+  ]
+}
