@@ -96,7 +96,9 @@ class CodeEncoder:
             r"\.send\(",
         ],
         "missing_reentrancy_guard": [
-            r"function\s+\w+",
+            r"\.call\{",
+            r"\.call\(",
+            r"\.send\(",
         ],
         "unchecked_arithmetic": [
             r"unchecked\s*\{",
@@ -119,9 +121,51 @@ class CodeEncoder:
         """
         import re
         found_patterns = {}
+
+        # Split: full function (for safety checks) vs body (for risk patterns)
+        brace_idx = function_source.find('{')
+        body_only = function_source[brace_idx+1:] if brace_idx >= 0 else function_source
+
+        # --- Safety checks on FULL function (includes modifiers in signature) ---
+        has_reentrancy_guard = bool(
+            re.search(r'nonReentrant|ReentrancyGuard', function_source, re.IGNORECASE)
+        )
+        if re.search(r'require\s*\(\s*!?\s*_locked', body_only):
+            has_reentrancy_guard = True
+        if re.search(r'_locked\s*=\s*true', body_only, re.IGNORECASE):
+            has_reentrancy_guard = True
+
+        ext_positions = [m.start() for m in re.finditer(
+            r'\.call\{|\.call\(|\.transfer\(|\.send\(', body_only)]
+        has_ext = len(ext_positions) > 0
+
+        # CEI violation: storage write AFTER last external call
+        has_cei_violation = False
+        if has_ext:
+            last_ext = max(ext_positions)
+            post_call = body_only[last_ext:]
+            has_cei_violation = bool(re.search(
+                r'\b\w+\s*\[[^\]]*\]\s*[-+]?=\s*(?!=)', post_call
+            ))
+
+        has_access_control = bool(re.search(
+            r'onlyOwner|onlyAdmin|require\s*\(\s*msg\.sender\s*==\s*\w+|require\s*\(\s*isOwner',
+            function_source, re.IGNORECASE
+        ))
+
+        # --- Risk patterns on BODY ONLY (not function signature!) ---
         for pattern_name, regexes in self.RISK_PATTERNS.items():
             for regex in regexes:
-                if re.search(regex, function_source, re.IGNORECASE):
+                if re.search(regex, body_only, re.IGNORECASE):
+                    if pattern_name == 'external_call_before_state_update':
+                        if not has_cei_violation or has_reentrancy_guard:
+                            continue
+                    elif pattern_name == 'missing_reentrancy_guard':
+                        if has_reentrancy_guard or not ext_positions:
+                            continue
+                    elif pattern_name == 'missing_access_control':
+                        if has_access_control:
+                            continue
                     found_patterns[pattern_name] = True
                     break
         return found_patterns
@@ -274,7 +318,7 @@ class IntentCodeMismatchDetector:
 
     # Tunable thresholds (calibrated on 20-sample seed set)
     MISMATCH_THRESHOLD_HIGH = 0.45
-    MISMATCH_THRESHOLD_MEDIUM = 0.25
+    MISMATCH_THRESHOLD_MEDIUM = 0.30
     MISMATCH_THRESHOLD_LOW = 0.10
 
     def __init__(self, immune_library: Optional[ImmuneLibrary] = None):
@@ -307,25 +351,24 @@ class IntentCodeMismatchDetector:
             # Step 4: Cosine distance
             base_score = self.embedder.cosine_distance(intent_vec, code_vec)
 
-            # Rule-based boost: known dangerous patterns detected in code
+            # Rule-based boost: additive, safety-filtered patterns only
             DANGEROUS_PATTERNS = {
-                "external_call_before_state_update": 0.45,
-                "missing_access_control": 0.40,
-                "spot_price_oracle": 0.38,
-                "missing_reentrancy_guard": 0.25,
-                "unchecked_arithmetic": 0.30,
+                "external_call_before_state_update": 0.30,
+                "missing_access_control": 0.20,
+                "spot_price_oracle": 0.20,
+                "missing_reentrancy_guard": 0.15,
+                "unchecked_arithmetic": 0.15,
             }
-            pattern_boost = max(
-                (DANGEROUS_PATTERNS.get(p, 0) for p in code_patterns),
-                default=0.0
+            pattern_boost = sum(
+                DANGEROUS_PATTERNS.get(p, 0) for p in code_patterns
             )
 
-            # Safety claim in intent amplifies the mismatch
+            # Safety claim amplifies ONLY when dangerous patterns confirmed
             safety_keywords = ["safe", "secur", "protect", "verified", "only", "prevent"]
             safety_claimed = any(kw in intent_text.lower() for kw in safety_keywords)
-            amplifier = 1.3 if safety_claimed else 1.0
+            amplifier = 1.2 if (safety_claimed and pattern_boost > 0) else 1.0
 
-            mismatch_score = min(1.0, max(base_score, pattern_boost) * amplifier)
+            mismatch_score = min(1.0, (base_score + pattern_boost) * amplifier)
 
             # Step 5: Immune library lookup
             immune_matches = []
@@ -364,11 +407,24 @@ class IntentCodeMismatchDetector:
     # ── Helpers ──────────────────────────────
 
     def _extract_function_body(self, source: str, func_name: str) -> str:
-        """Naive brace-matching extractor. Replace with proper AST parser in v0.2."""
+        """Brace-counting extractor. Returns FULL function (signature + body)."""
         import re
-        pattern = rf"function\s+{re.escape(func_name)}\s*\([^{{]*\{{([\s\S]*?)\}}"
+        pattern = rf"function\s+{re.escape(func_name)}\s*\("
         match = re.search(pattern, source)
-        return match.group(1) if match else ""
+        if not match:
+            return ""
+        idx = source.find("{", match.end())
+        if idx < 0:
+            return ""
+        depth = 1
+        i = idx + 1
+        while i < len(source) and depth > 0:
+            if source[i] == "{":
+                depth += 1
+            elif source[i] == "}":
+                depth -= 1
+            i += 1
+        return source[match.start():i]
 
     def _patterns_to_text(self, patterns: dict) -> str:
         """Convert code pattern dict to natural language for embedding."""
