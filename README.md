@@ -1,148 +1,183 @@
 # 🧬 HELIX Chain
 
-**AI-native smart contract verification and runtime defense.**
+**AI-Native Smart Contract Verification & Runtime Defense**
 
-HELIX detects intent-code mismatches before attackers do. Every exploit it stops becomes a permanent immune signature — protecting the entire network forever.
+> HELIX starts with AI-native smart contract verification and runtime defense, and evolves toward an AI-native blockchain infrastructure where every attack permanently strengthens the entire network.
 
-## How It Works
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green.svg)](https://python.org)
+[![Status: MVP](https://img.shields.io/badge/Status-MVP%20Live-orange.svg)]()
+[![CI](https://github.com/helix-chain/helix/actions/workflows/helix-ci.yml/badge.svg?branch=main)](https://github.com/helix-chain/helix/actions/workflows/helix-ci.yml)
 
-1. Extract developer intent from NatSpec comments & code structure
-2. Encode on-chain code behavior → 768-dim vector (CodeBERT)
-3. Compute cosine distance: high distance = high risk
-4. Match against immune library of 500 historical exploits
-5. Rule-based pattern detection with safety-aware amplification
+---
 
-## Quick Start
+## The Problem
+
+**$3.4 billion** lost to smart contract exploits in 2025 alone. Existing tools detect and alert — but the same attack pattern works again on the next protocol. The industry has no memory.
+
+## The HELIX Approach
+
+| Capability | Forta | OZ Defender | **HELIX** |
+|-----------|-------|-------------|-----------|
+| Detection | ✅ Alerts | ✅ Monitoring | ✅ AI behavioral analysis |
+| Response | ❌ Alert only | ❌ Alert only | ✅ Auto-freeze + repair candidates |
+| Immune Memory | ❌ Rules reset per project | ❌ No cross-project learning | ✅ Every attack → permanent signature |
+| Intent Verification | ❌ | ❌ | ✅ Code vs. documentation matching |
+
+**Core moat:** The Immune Library — a 768-dimensional vector database of attack signatures that grows with every detected exploit. Fork the code, but you can't fork the history.
+
+---
+
+## 🚀 Quick Start — Intent-Code Mismatch Detector (MVP)
+
+The mismatch detector compares what a smart contract's documentation *claims* against what the code *actually does*, using CodeBERT embeddings + rule-based pattern detection.
+
+### Prerequisites
+
+- Python 3.11+
+- pip
+
+### Install & Run
 
 ```bash
-git clone https://github.com/helix-chain/helix
+git clone https://github.com/helix-chain/helix.git
 cd helix
 python -m venv .venv
-# Windows
-.venv\Scripts\Activate
+
 # Linux/Mac
 source .venv/bin/activate
-pip install torch transformers
+
+# Windows
+.venv\Scripts\activate
+
+pip install torch transformers numpy
+python mismatch_detector.py
 ```
 
-### Scan a Contract
+### CLI Usage
 
 ```bash
-python helix_scan.py scan YourContract.sol
+# Scan a single Solidity file
+helix scan contract.sol
+
+# With optional contract address
+helix scan contract.sol --address 0x1234...
+
+# JSON output (for CI/CD integration)
+helix scan contract.sol --json
 ```
 
-### Example Output
+Exit codes: `0` = LOW/MEDIUM (safe), `1` = HIGH/CRITICAL (action required), `2` = error.
+
+### Demo Output
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║                    HELIX SCAN REPORT                        ║
-╠══════════════════════════════════════════════════════════════╣
-║  File:         VulnerableVault.sol                          ║
-║  Risk Level:   CRITICAL                                     ║
-║  Score:        0.5755                                        ║
-║  Attack Class: reentrancy                                   ║
-║  Evidence:     external_call_before_state_update             ║
-║  Scan Time:    0.8s                                         ║
-╚══════════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════
+  HELIX — Intent-Code Mismatch Detector v0.1
+═══════════════════════════════════════════════════
+
+Contract:    VulnerableVault.sol
+Function:    withdraw()
+
+Risk Score:  0.5755
+Risk Level:  ██████████░░░░░░░░░░ CRITICAL
+
+Attack Class:  reentrancy
+Details:       External call before state update detected.
+               No reentrancy guard present.
+
+Recommendation: Add nonReentrant modifier or
+                apply checks-effects-interactions pattern.
 ```
 
-### CLI Options
+---
 
-```
-helix scan <file.sol> [--address 0x...] [--json]
-  --address    Attach contract address to report
-  --json       Output raw JSON format
-  Exit codes:  0 = LOW/MEDIUM, 1 = HIGH/CRITICAL, 2 = error
-```
+## 🛡️ Immune Library
 
-## Immune Library
+**500 verified attack signatures** covering **$35.47 billion** in historical losses across **10 attack classes**.
 
-| Metric | Value |
-|--------|-------|
-| Total Signatures | **500** |
-| Attack Classes | **10** |
-| Total Loss Covered | **$35.47B+** |
-| Source Types | public_postmortem (427), audit_report (33), pattern_derived (40) |
+| Attack Class | Signatures | Example |
+|-------------|-----------|---------|
+| Flash Loan Manipulation | 65 | bZx, Pancake Bunny |
+| Access Control | 61 | Poly Network, Parity |
+| Logic Error | 57 | Compound, Cover |
+| Oracle Manipulation | 49 | Harvest, Mango Markets |
+| Reentrancy | 47 | The DAO, Curve |
+| Cross-Chain Bridge | 47 | Ronin, Wormhole |
+| Key Compromise | 46 | Ronin, Harmony |
+| Governance Attack | 46 | Beanstalk, Build Finance |
+| Rug Pull | 42 | Squid Game, AnubisDAO |
+| Integer Overflow | 40 | BEC Token, SMT |
 
-### Attack Class Distribution
+Each signature includes: 768-dim CodeBERT embedding, attack class, loss amount, contract address, TX hash, and source postmortem link.
 
-| Class | Count |
-|-------|-------|
-| flash_loan_manipulation | 65 |
-| access_control | 61 |
-| logic_error | 57 |
-| oracle_manipulation | 49 |
-| reentrancy | 47 |
-| cross_chain_bridge | 47 |
-| key_compromise | 46 |
-| governance_attack | 46 |
-| rug_pull | 42 |
-| integer_overflow | 40 |
+---
 
-## Verification Results
+## ✅ Verification Results
 
-| Test | Result |
-|------|--------|
-| False Positive Rate | **0% (0/104)** — 100 clean contracts + 4 blue-chip mainnet (WETH/DAI/USDT/USDC) |
-| True Positive Rate | **100% (42/42)** — detectable historical attacks |
-| CLI Tests | **5/5 PASS** |
+| Metric | Result |
+|--------|--------|
+| **False Positive Rate** | **0/110 = 0%** — 100 clean ERC-20 + 4 mainnet blue-chip (USDC, USDT, DAI, WETH) + 6 proxy/diamond/CREATE2 architecture patterns |
+| **True Positive Rate** | **42/42 = 100%** of detectable historical exploits |
+| **CLI Tests** | 5/5 passed |
+| **CI** | GitHub Actions regression guard (smoke + proxy FP) |
+| **Known Limitations** | 3 cases: off-chain key leakage, Solidity <0.8 integer overflow, compiler-level bugs |
+| **Out of MVP Scope** | 5 cases: rug pulls, pure logic errors |
 
-## Architecture
+---
+
+## 🏗️ Architecture — Seven-Layer Neural Stack
 
 ```
 L1  Proof of Intelligence (PoI)    Miners execute AI tasks + ZKP verification
-L2  HELIX EYE                      Full observability: logs/metrics/traces/events
-L3  NEURAL AUDIT                   AI intent-code mismatch detection ← MVP
-L4  REFLEX ENGINE                  Automated low-risk + human-approved high-risk actions
-L5  PROOF GATE                     ZKP behavior certificates + graduated release gates
-L6  MEMORY CORTEX                  Immune library (attack → permanent signature → network defense) ← 500 sigs
-L7  GENESIS ENGINE                 AI proposals → dual-chamber voting → phased rollout
+L2  HELIX EYE                      Full telemetry: logs/metrics/traces/events
+L3  NEURAL AUDIT ←── MVP HERE      AI real-time attribution (contract/user/version)
+L4  REFLEX ENGINE                  Auto low-risk actions + human approval for high-risk
+L5  PROOF GATE                     ZKP behavior certificates + canary deployments
+L6  MEMORY CORTEX                  Immune library (attack → permanent signature)
+L7  GENESIS ENGINE                 AI proposals → dual-chamber voting → staged rollout
 ```
 
-## Repository Structure
+---
 
-```
-helix/
-├── mismatch_detector.py           # Core detection engine
-├── helix_scan.py                  # CLI: helix scan <file.sol>
-├── helix.bat                      # Windows CLI wrapper
-├── immune_library_500.json        # 500 attack signatures
-├── immune_library_500_sources.json # Source provenance tracking
-├── immune_library_50.json         # Legacy 50-signature library
-├── VulnerableVault.sol            # Test: CRITICAL reentrancy
-├── SafeToken.sol                  # Test: LOW (clean contract)
-├── mainnet_test_contracts.py      # Blue-chip FP test contracts
-├── mainnet_test_runner.py         # FP regression test runner
-├── mainnet_test_manifest.json     # Test configuration
-├── attack_replay_contracts.py     # Historical attack replays
-└── replay_test_runner.py          # TP regression test runner
-```
+## 📍 Roadmap
 
-## Status: Phase 1 — EVM Smart Contract AI Security Tool
+| Phase | Timeline | Milestone |
+|-------|----------|-----------|
+| **Phase 1** ← Current | Month 1–6 | EVM AI security tool: MVP detector + immune library + CLI |
+| **Phase 2** | Month 6–12 | Runtime monitor + multi-file scan + API service |
+| **Phase 3** | Month 12–18 | HELIX testnet with PoI consensus + HexScript |
 
-- [x] MVP: Intent-code mismatch detection (mismatch_detector.py)
-- [x] CLI: `helix scan <file.sol>` with JSON output
-- [x] Immune library: 500 signatures, 10 attack classes, $35.47B coverage
-- [x] FP rate: 0% (104 tests including mainnet blue-chip contracts)
-- [x] TP rate: 100% (42/42 detectable historical attacks)
-- [ ] Design partners: ≥3 (0/3)
-- [ ] Testnet deployment
+### Phase 2 Entry Gates
+- [x] False positive rate < 10% → **0%**
+- [x] Verified immune signatures ≥ 500 → **500**
+- [ ] Design partner agreements ≥ 3
 
-## Tech Stack
+---
+
+## 🔧 Tech Stack
 
 | Component | Technology |
-|-----------|------------|
-| Node/Consensus/ZKP/CLI | Rust |
-| AI Engine | Python + PyTorch (CodeBERT 768-dim) |
-| API | Axum (Rust) |
-| State Storage | PostgreSQL + pgvector |
-| Chain Storage | RocksDB |
-| Event Bus | Redis Streams |
-| ZKP Framework | Noir + Barretenberg |
-| EVM Execution | Revm |
+|-----------|-----------|
+| Node / Consensus / ZKP / CLI | Rust 1.78+ |
+| AI Engine | Python 3.11+ / PyTorch 2.3+ |
+| API | Axum 0.7+ (Rust) |
+| State Storage | PostgreSQL 16 + pgvector (768-dim vectors) |
+| Chain Storage | RocksDB 8+ |
+| Event Bus | Redis Streams 7+ |
+| ZKP Framework | Noir + Barretenberg 0.30+ |
+| EVM Execution | Revm 11+ |
 
-## Contact
+---
 
-- **Email:** contact@helix-foundation.com
+## 📄 License
+
+MIT
+
+---
+
+## 📬 Contact
+
+- **Email:** founder@helix-foundation.com
 - **Website:** helix-foundation.com
 - **GitHub:** github.com/helix-chain/helix
