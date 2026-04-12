@@ -68,7 +68,7 @@ def main():
             all_pass = False
             continue
 
-        score = res.get("risk_score", 0.0)
+        score = res.get("overall_mismatch_score", 0.0)
         level = res.get("risk_level", "UNKNOWN")
         passed = True
         reason = ""
@@ -151,3 +151,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
