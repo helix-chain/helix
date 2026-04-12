@@ -1,0 +1,7 @@
+# requirements-ci.txt
+# HELIX CI dependencies — CPU-only PyTorch for lightweight CI
+# Version: V1.0_202604120942
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers

@@ -1,0 +1,72 @@
+# HELIX CI — Regression Guard
+# Version: V1.0_202604120942
+# Trigger: push to main, pull requests
+# Structure: single workflow → single job → multi-step
+# Scope: smoke test + proxy FP suite (no Docker, no matrix, no deploy)
+
+name: HELIX CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  regression-guard:
+    name: Smoke + FP Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # --- Setup ---
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # --- Cache Layer 1: pip packages ---
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      # --- Cache Layer 2: HuggingFace model (CodeBERT ~500MB) ---
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-codebert-base-v1
+          restore-keys: |
+            hf-codebert-base-
+
+      # --- Install ---
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-ci.txt
+
+      # --- Test Step 1: Smoke ---
+      - name: Smoke test
+        run: make smoke-ci
+
+      # --- Test Step 2: Proxy FP ---
+      - name: Proxy/Diamond/CREATE2 FP test
+        run: make fp-proxy-ci
+
+      # --- Failure: upload debug artifacts ---
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failure-reports
+          path: |
+            ci_smoke_report_*.json
+            proxy_fp_test_report_*.json
+          retention-days: 7
