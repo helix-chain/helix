@@ -389,10 +389,14 @@ class IntentCodeMismatchDetector:
 
         # Step 6: Aggregate
         if not function_reports:
-            overall_score = 0.0
-        else:
-            overall_score = max(r.mismatch_score for r in function_reports)
+            return MismatchReport(
+                contract_address=contract.contract_address,
+                overall_mismatch_score=0.0,
+                risk_level="LOW",
+                recommended_action="No analyzable Solidity functions detected. Manual review recommended.",
+            )
 
+        overall_score = max(r.mismatch_score for r in function_reports)
         risk_level = self._score_to_risk(overall_score)
 
         return MismatchReport(
