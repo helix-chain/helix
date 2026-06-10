@@ -21,6 +21,8 @@ pub enum AdmitError {
     NonZeroFee,
     #[error("wrong chain id (expected {expected})")]
     ChainId { expected: u64 },
+    #[error("transaction type not supported on this devnet (EIP-4844 blob / EIP-7702 set-code)")]
+    UnsupportedType,
     #[error("transaction rejected by security hook")]
     HookRejected,
     #[error("transaction already pending")]
@@ -44,6 +46,12 @@ impl Mempool {
 
     /// Validate and admit a decoded transaction. Returns its hash.
     pub fn admit(&mut self, envelope: TxEnvelope) -> Result<B256, AdmitError> {
+        // Blob (4844) and set-code (7702) txs carry semantics the v0.1
+        // executor would silently drop — reject instead of mis-executing.
+        if matches!(envelope, TxEnvelope::Eip4844(_) | TxEnvelope::Eip7702(_)) {
+            return Err(AdmitError::UnsupportedType);
+        }
+
         let from = envelope
             .recover_signer()
             .map_err(|e| AdmitError::Signature(e.to_string()))?;
@@ -97,5 +105,78 @@ impl Mempool {
 
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::Ordering;
+
+    use alloy_consensus::{SignableTransaction, TxLegacy};
+    use alloy_primitives::{TxKind, U256, address};
+    use alloy_signer::SignerSync;
+    use alloy_signer_local::PrivateKeySigner;
+
+    use super::*;
+    use crate::hook::{CountingHook, PassthroughHook};
+
+    /// Anvil/Hardhat well-known dev key #0 (public test key, devnet only).
+    const DEV_KEY_0: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    const CHAIN_ID: u64 = 2026;
+
+    struct RejectingHook;
+
+    impl SecurityHook for RejectingHook {
+        fn inspect(&self, _tx: &TxView) -> HookVerdict {
+            HookVerdict::Reject
+        }
+    }
+
+    fn signed_legacy(gas_price: u128) -> TxEnvelope {
+        let signer: PrivateKeySigner = DEV_KEY_0.parse().expect("dev key");
+        let tx = TxLegacy {
+            chain_id: Some(CHAIN_ID),
+            nonce: 0,
+            gas_price,
+            gas_limit: 21_000,
+            to: TxKind::Call(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8")),
+            value: U256::from(1u64),
+            input: Default::default(),
+        };
+        let sig = signer.sign_hash_sync(&tx.signature_hash()).expect("sign");
+        tx.into_signed(sig).into()
+    }
+
+    /// AC-6 ordering proof: a rejecting hook keeps the tx OUT of the queue —
+    /// the gate runs before admission, not at block production.
+    #[test]
+    fn rejecting_hook_blocks_admission() {
+        let mut pool = Mempool::new(CHAIN_ID, Arc::new(RejectingHook));
+        let result = pool.admit(signed_legacy(0));
+        assert!(matches!(result, Err(AdmitError::HookRejected)));
+        assert!(pool.is_empty(), "rejected tx must never enter the queue");
+    }
+
+    /// Fee validation runs before the hook: a fee-paying tx is refused
+    /// without the hook ever seeing it.
+    #[test]
+    fn non_zero_fee_rejected_before_hook() {
+        let hook = Arc::new(CountingHook::default());
+        let mut pool = Mempool::new(CHAIN_ID, hook.clone());
+        let result = pool.admit(signed_legacy(1_000_000_000));
+        assert!(matches!(result, Err(AdmitError::NonZeroFee)));
+        assert_eq!(hook.seen.load(Ordering::SeqCst), 0);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn passthrough_admits_zero_fee_tx() {
+        let mut pool = Mempool::new(CHAIN_ID, Arc::new(PassthroughHook));
+        let hash = pool.admit(signed_legacy(0)).expect("zero-fee admitted");
+        assert_eq!(pool.len(), 1);
+        let drained = pool.drain();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].hash, hash);
+        assert!(pool.is_empty());
     }
 }

@@ -114,3 +114,10 @@ touching callers.
 - No gas economics: zero-fee transactions only
 - `eth_getBalance`/`eth_call` always answer against `latest`
 - No event logs in receipts; no batch JSON-RPC
+- Invalid transactions (bad nonce, insufficient funds) are dropped at block
+  production with a warning log — `eth_sendRawTransaction` already returned
+  the hash, but no receipt will ever appear; poll receipts with a timeout.
+  The FIFO pool does not re-order by nonce.
+- EIP-4844 (blob) and EIP-7702 (set-code) transactions are rejected at
+  admission. Legacy/EIP-2930/EIP-1559 are executed, but access lists are
+  treated as gas hints only and receipts always report `"type": "0x0"`.

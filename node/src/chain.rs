@@ -60,6 +60,8 @@ pub struct Receipt {
     pub to: Option<Address>,
     pub contract_address: Option<Address>,
     pub gas_used: u64,
+    /// Running gas total within the block, up to and including this tx.
+    pub cumulative_gas_used: u64,
     /// 1 = success, 0 = reverted/halted.
     pub status: u64,
     pub output: Bytes,

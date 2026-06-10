@@ -95,7 +95,7 @@ fn receipt_json(receipt: &Receipt) -> Value {
         "to": receipt.to.map(|a| format!("{a}")),
         "contractAddress": receipt.contract_address.map(|a| format!("{a}")),
         "gasUsed": hex_u64(receipt.gas_used),
-        "cumulativeGasUsed": hex_u64(receipt.gas_used),
+        "cumulativeGasUsed": hex_u64(receipt.cumulative_gas_used),
         "status": hex_u64(receipt.status),
         "logs": [],
         "logsBloom": format!("0x{}", "00".repeat(256)),

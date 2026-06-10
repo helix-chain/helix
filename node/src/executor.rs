@@ -106,8 +106,11 @@ pub fn execute_block(chain: &mut Chain, txs: Vec<PendingTx>, timestamp: u64) -> 
 
     let mut tx_hashes = Vec::with_capacity(txs.len());
     let mut receipts = Vec::with_capacity(txs.len());
+    // Dropped (invalid) txs must not leave gaps: index/cumulative gas track
+    // only transactions that actually made it into the block.
+    let mut cumulative_gas = 0u64;
 
-    for (index, tx) in txs.iter().enumerate() {
+    for tx in txs.iter() {
         let mut evm = Context::mainnet()
             .with_db(&mut db)
             .modify_cfg_chained(|cfg| cfg.chain_id = chain.chain_id)
@@ -144,19 +147,21 @@ pub fn execute_block(chain: &mut Chain, txs: Vec<PendingTx>, timestamp: u64) -> 
             TxKind::Create => None,
         };
 
-        tx_hashes.push(tx.hash);
+        cumulative_gas += gas_used;
         receipts.push(Receipt {
             tx_hash: tx.hash,
             block_number: number,
             block_hash: alloy_primitives::B256::ZERO, // sealed below
-            transaction_index: index as u64,
+            transaction_index: tx_hashes.len() as u64,
             from: tx.from,
             to,
             contract_address,
             gas_used,
+            cumulative_gas_used: cumulative_gas,
             status,
             output,
         });
+        tx_hashes.push(tx.hash);
     }
 
     persist(chain, &db);
