@@ -1,0 +1,30 @@
+[package]
+name = "helix-node"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy-consensus = { version = "2.0.5", features = ["k256"] }
+alloy-eips = "2.0.5"
+alloy-primitives = "1.6.0"
+alloy-rlp = "0.3.15"
+anyhow = "1.0.102"
+axum = "0.8.9"
+clap = { version = "4.6.1", features = ["derive"] }
+hex = "0.4.3"
+# revm default features pull in C bindings (secp256k1, c-kzg, blst) forbidden by spec §2.
+# Bare "std" keeps everything pure Rust: ecrecover falls back to k256; KZG/BLS precompiles
+# (EIP-4844/2537) are unavailable, which a devnet does not need.
+revm = { version = "40.0.3", default-features = false, features = ["std"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+[dev-dependencies]
+alloy-signer = "2.0.5"
+alloy-signer-local = "2.0.5"
+# local http e2e only — no TLS stack needed
+reqwest = { version = "0.13.4", default-features = false, features = ["json"] }
