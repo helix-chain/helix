@@ -13,3 +13,21 @@ mainnet_test_log.json
 patch_*.py
 clean_contracts_*.py
 fp_test_runner.py
+
+# Internal docs & business materials — NEVER push to public repo
+docs/
+CLAUDE.md
+CODE_MAP.md
+.claude/
+
+# Local marketing / screenshot assets (README does not reference them)
+*.png
+
+# Local backups & versioned local artifacts (keep local, never delete)
+*.bak_before_*
+*_backup_*.py
+p0a_verify_*.py
+
+# Local test reports (append-only local history)
+ci_smoke_report_*.json
+proxy_fp_test_report_*.json
