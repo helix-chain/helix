@@ -6,6 +6,7 @@
 
 pub mod chain;
 pub mod config;
+pub mod detector;
 pub mod executor;
 pub mod genesis;
 pub mod hook;
