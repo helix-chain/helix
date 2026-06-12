@@ -31,3 +31,4 @@ p0a_verify_*.py
 # Local test reports (append-only local history)
 ci_smoke_report_*.json
 proxy_fp_test_report_*.json
+node/target/
