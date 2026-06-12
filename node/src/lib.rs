@@ -9,6 +9,7 @@ pub mod config;
 pub mod executor;
 pub mod genesis;
 pub mod hook;
+pub mod immune;
 pub mod mempool;
 pub mod node;
 pub mod rpc;

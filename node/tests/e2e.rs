@@ -1,10 +1,12 @@
 //! End-to-end tests: boot a real node in-process, drive it over HTTP JSON-RPC.
 //!
-//! Covers spec acceptance criteria:
-//! - AC-3: all six RPC methods respond with JSON-RPC 2.0 shapes
-//! - AC-4: zero-fee transfer included in next block, exact balance change, status=1
-//! - AC-5: contract deployment + eth_call returns the expected value
-//! - AC-6: SecurityHook observes every transaction before pool admission
+//! Covers the build-spec (V1.1) acceptance criteria plus the v0.2 immune gate
+//! (note: the engineering spec v1.0 has no AC numbering — these AC ids are ours):
+//! - all six RPC methods respond with JSON-RPC 2.0 shapes
+//! - zero-fee transfer included in next block, exact balance change, status=1
+//! - contract deployment + eth_call returns the expected value
+//! - SecurityHook observes every transaction before pool admission (CountingHook)
+//! - the deterministic immune gate rejects a matching-signature transaction
 
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -259,6 +261,69 @@ async fn rejects_non_zero_fee_and_unknown_method() {
     // Unknown method → -32601.
     let resp = rpc(&client, &url, "eth_getLogs", json!([])).await;
     assert_eq!(resp["error"]["code"], -32601);
+
+    handle.shutdown().await;
+}
+
+#[tokio::test]
+async fn immune_gate_rejects_matching_signature() {
+    use helix_node::immune::ImmuneHook;
+
+    let handle = node::start(NodeConfig::test(), Arc::new(ImmuneHook::new()))
+        .await
+        .expect("node starts");
+    let url = format!("http://{}", handle.rpc_addr);
+    let client = reqwest::Client::new();
+
+    // A tx whose calldata starts with the demo immune signature 0xdeadbeef is
+    // rejected at admission by the deterministic gate — it never reaches a block.
+    let raw = sign_legacy(
+        DEV_KEY_0,
+        TxLegacy {
+            chain_id: Some(CHAIN_ID),
+            nonce: 0,
+            gas_price: 0,
+            gas_limit: 100_000,
+            to: TxKind::Call(DEV_ADDR_1),
+            value: U256::ZERO,
+            input: hex::decode("deadbeef00").unwrap().into(),
+        },
+    );
+    let resp = rpc(
+        &client,
+        &url,
+        "eth_sendRawTransaction",
+        json!([format!("0x{}", hex::encode(&raw))]),
+    )
+    .await;
+    let message = resp["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("immune signature match"),
+        "malicious tx rejected by immune gate: {resp}"
+    );
+
+    // A clean tx (no signature match), reusing nonce 0, is admitted and mined.
+    let raw = sign_legacy(
+        DEV_KEY_0,
+        TxLegacy {
+            chain_id: Some(CHAIN_ID),
+            nonce: 0,
+            gas_price: 0,
+            gas_limit: 21_000,
+            to: TxKind::Call(DEV_ADDR_1),
+            value: U256::from(1u64),
+            input: Default::default(),
+        },
+    );
+    let tx_hash = rpc_result(
+        &client,
+        &url,
+        "eth_sendRawTransaction",
+        json!([format!("0x{}", hex::encode(&raw))]),
+    )
+    .await;
+    let receipt = wait_for_receipt(&client, &url, tx_hash.as_str().unwrap()).await;
+    assert_eq!(receipt["status"], "0x1", "clean tx mined: {receipt}");
 
     handle.shutdown().await;
 }

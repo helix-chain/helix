@@ -8,7 +8,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 
 use helix_node::config::{Cli, NodeConfig};
-use helix_node::hook::PassthroughHook;
+use helix_node::immune::ImmuneHook;
 use helix_node::node;
 
 #[tokio::main]
@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     }
 
     let config = NodeConfig::from_cli(&cli);
-    let handle = node::start(config, Arc::new(PassthroughHook)).await?;
+    let handle = node::start(config, Arc::new(ImmuneHook::new())).await?;
 
     tracing::info!("press Ctrl+C to stop");
     tokio::signal::ctrl_c().await?;

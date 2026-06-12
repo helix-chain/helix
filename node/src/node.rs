@@ -47,12 +47,12 @@ pub async fn start(config: NodeConfig, hook: Arc<dyn SecurityHook>) -> Result<No
         config.chain_id,
         genesis::genesis_alloc(),
     )));
-    let mempool = Arc::new(Mutex::new(Mempool::new(config.chain_id, hook)));
+    let mempool = Arc::new(Mutex::new(Mempool::new()));
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     // --- JSON-RPC server -------------------------------------------------
-    let router = crate::rpc::router(chain.clone(), mempool.clone());
+    let router = crate::rpc::router(chain.clone(), mempool.clone(), hook, config.chain_id);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", config.rpc_port))
         .await
         .context("binding RPC listener")?;

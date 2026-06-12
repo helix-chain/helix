@@ -93,19 +93,30 @@ contract deployment + `eth_call` output, and security-hook coverage.
 ```text
 helix-node (lib + bin)
 ├── config    CLI flags → NodeConfig (chain_id 2026)
-├── genesis   3 well-known dev accounts, 1M HLX each
+├── genesis   3 well-known dev accounts, 1M HLX each + 1B hard-cap assert
 ├── state     Storage trait + InMemoryStorage      ← v0.2: RocksDB backend (feature)
-├── hook      SecurityHook trait + PassthroughHook ← v0.2: mismatch-detector / immune library
-├── mempool   FIFO queue, zero-fee admission, hook gate (pre-admission)
+├── hook      SecurityHook trait, graded HookVerdict (Allow / Flag / Reject)
+├── immune    ImmuneHook: deterministic signature gate (default)  ← Phase 2: immune library
+├── mempool   FIFO queue, zero-fee admission (validate + admit_validated)
 ├── executor  Revm: block execution + read-only eth_call
 ├── chain     Block / Receipt / Chain container
-├── rpc       Axum JSON-RPC 2.0 (6 methods)
+├── rpc       Axum JSON-RPC 2.0 (6 methods) — runs the hook OUTSIDE the mempool lock
 └── node      assembly: RPC server + interval block producer + graceful shutdown
 ```
 
-Both v0.2 seams are synchronous traits on purpose — a RocksDB `Storage`
-implementation or a detector-backed `SecurityHook` can be slotted in without
-touching callers.
+### Security hook (v0.2, task B1)
+
+Every transaction is screened by a `SecurityHook` between cheap validation and
+mempool admission. The default node runs `ImmuneHook` — a fast, **deterministic**
+signature gate that matches a transaction's calldata / creation bytecode against
+a fixed table (a demo placeholder for the immune library). Determinism keeps
+admission consensus-safe: a fuzzy ML score must never gate admission.
+
+The hook runs on the blocking pool, **outside the mempool lock**, so a future
+slow detector cannot stall the runtime. The verdict is a graded superset
+(`Allow` / `Flag { score }` / `Reject`), so the ML `mismatch_detector.py` can
+later be wired as an **advisory deploy-time sidecar** without a breaking trait
+change. The `Storage` trait remains the other v0.2 seam (RocksDB backend).
 
 ## Known limitations (v0.1, by spec)
 

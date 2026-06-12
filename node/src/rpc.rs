@@ -15,18 +15,29 @@ use tokio::sync::Mutex;
 
 use crate::chain::{Chain, Receipt};
 use crate::executor;
+use crate::hook::{HookVerdict, SecurityHook};
 use crate::mempool::Mempool;
 
 #[derive(Clone)]
 pub struct AppState {
     pub chain: Arc<Mutex<Chain>>,
     pub mempool: Arc<Mutex<Mempool>>,
+    pub hook: Arc<dyn SecurityHook>,
+    pub chain_id: u64,
 }
 
-pub fn router(chain: Arc<Mutex<Chain>>, mempool: Arc<Mutex<Mempool>>) -> Router {
-    Router::new()
-        .route("/", post(handle))
-        .with_state(AppState { chain, mempool })
+pub fn router(
+    chain: Arc<Mutex<Chain>>,
+    mempool: Arc<Mutex<Mempool>>,
+    hook: Arc<dyn SecurityHook>,
+    chain_id: u64,
+) -> Router {
+    Router::new().route("/", post(handle)).with_state(AppState {
+        chain,
+        mempool,
+        hook,
+        chain_id,
+    })
 }
 
 // --- JSON-RPC plumbing ----------------------------------------------------
@@ -136,9 +147,45 @@ async fn handle(State(state): State<AppState>, Json(req): Json<Value>) -> Json<V
         "eth_sendRawTransaction" => match params.first().map(parse_bytes) {
             Some(Ok(raw)) => match TxEnvelope::decode_2718(&mut raw.as_ref()) {
                 Ok(envelope) => {
-                    let mut pool = state.mempool.lock().await;
-                    match pool.admit(envelope) {
-                        Ok(hash) => ok(id, json!(format!("{hash}"))),
+                    // Phase 1: cheap, stateless validation (no lock held).
+                    match Mempool::validate(state.chain_id, envelope) {
+                        Ok((view, pending)) => {
+                            // Phase 2: security hook OUTSIDE the mempool lock, on
+                            // the blocking pool — a slow hook (the v0.2 detector)
+                            // can't stall the runtime or serialize admissions.
+                            let hook = state.hook.clone();
+                            let verdict = tokio::task::spawn_blocking(move || hook.inspect(&view))
+                                .await
+                                .unwrap_or(HookVerdict::Allow); // join error → fail-open (devnet)
+                            match verdict {
+                                HookVerdict::Reject { risk, reason } => err(
+                                    id,
+                                    SERVER_ERROR,
+                                    format!("rejected by security hook ({risk:?}): {reason}"),
+                                ),
+                                other => {
+                                    if let HookVerdict::Flag {
+                                        risk,
+                                        score,
+                                        reason,
+                                    } = &other
+                                    {
+                                        tracing::warn!(
+                                            risk = ?risk,
+                                            score = *score,
+                                            reason = %reason,
+                                            "security-hook: flagged but admitted"
+                                        );
+                                    }
+                                    // Phase 3: enqueue under lock.
+                                    let mut pool = state.mempool.lock().await;
+                                    match pool.admit_validated(pending) {
+                                        Ok(hash) => ok(id, json!(format!("{hash}"))),
+                                        Err(e) => err(id, SERVER_ERROR, e.to_string()),
+                                    }
+                                }
+                            }
+                        }
                         Err(e) => err(id, SERVER_ERROR, e.to_string()),
                     }
                 }
@@ -147,6 +194,7 @@ async fn handle(State(state): State<AppState>, Json(req): Json<Value>) -> Json<V
             Some(Err(e)) => err(id, INVALID_PARAMS, e),
             None => err(id, INVALID_PARAMS, "missing raw tx param"),
         },
+
         "eth_getTransactionReceipt" => match params.first().map(parse_b256) {
             Some(Ok(hash)) => {
                 let chain = state.chain.lock().await;
