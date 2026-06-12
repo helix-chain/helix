@@ -18,12 +18,30 @@ pub fn genesis_balance() -> U256 {
     U256::from(1_000_000u64) * U256::from(10u64).pow(U256::from(18u64))
 }
 
+/// HELIX hard cap (Tokenomics v2.0 §2.1): 1,000,000,000 HLX — the economic
+/// model's single "constitutional invariant", enforced at the consensus layer
+/// in Phase 3. v0.1 mints nothing beyond genesis, so this only anchors the
+/// allocation; any future PoI emission must keep total supply ≤ this value.
+pub fn max_supply() -> U256 {
+    U256::from(1_000_000_000u64) * U256::from(10u64).pow(U256::from(18u64))
+}
+
 /// (address, balance) pairs applied to state at block 0.
 pub fn genesis_alloc() -> Vec<(Address, U256)> {
-    DEV_ACCOUNTS
+    let alloc: Vec<(Address, U256)> = DEV_ACCOUNTS
         .iter()
         .map(|addr| (*addr, genesis_balance()))
-        .collect()
+        .collect();
+    let total = alloc.iter().fold(U256::ZERO, |acc, (_, bal)| acc + *bal);
+    // assert (not debug_assert): the 1B hard cap is the economic model's
+    // constitutional invariant — it must hold in --release builds too, not
+    // just debug/test (debug_assert is compiled out under --release).
+    assert!(
+        total <= max_supply(),
+        "genesis allocation ({total}) exceeds the HLX hard cap ({})",
+        max_supply()
+    );
+    alloc
 }
 
 #[cfg(test)]
@@ -38,5 +56,16 @@ mod tests {
         for (_, balance) in alloc {
             assert_eq!(balance, expected);
         }
+    }
+
+    #[test]
+    fn genesis_total_within_hard_cap() {
+        let total = genesis_alloc()
+            .iter()
+            .fold(U256::ZERO, |acc, (_, bal)| acc + *bal);
+        assert!(total <= max_supply());
+        // 3 accounts × 1,000,000 HLX = 3,000,000 HLX, far under the 1B cap.
+        let expected = U256::from(3_000_000u64) * U256::from(10u64).pow(U256::from(18u64));
+        assert_eq!(total, expected);
     }
 }

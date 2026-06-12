@@ -1,6 +1,6 @@
 [package]
 name = "helix-node"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
@@ -15,7 +15,9 @@ hex = "0.4.3"
 # revm default features pull in C bindings (secp256k1, c-kzg, blst) forbidden by spec §2.
 # Bare "std" keeps everything pure Rust: ecrecover falls back to k256; KZG/BLS precompiles
 # (EIP-4844/2537) are unavailable, which a devnet does not need.
-revm = { version = "40.0.3", default-features = false, features = ["std"] }
+# optional_balance_check is a pure-Rust cfg feature (no C deps) that exposes
+# CfgEnv::disable_balance_check, used for value-bearing eth_call simulation.
+revm = { version = "40.0.3", default-features = false, features = ["std", "optional_balance_check"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 thiserror = "2.0.18"

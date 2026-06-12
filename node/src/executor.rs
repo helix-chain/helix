@@ -192,8 +192,11 @@ pub fn call(chain: &Chain, from: Address, to: Address, data: Bytes, value: U256)
         .with_db(&mut db)
         .modify_cfg_chained(|cfg| {
             cfg.chain_id = chain.chain_id;
-            // eth_call convenience: don't reject on nonce/balance bookkeeping.
+            // eth_call convenience: don't reject on nonce/balance bookkeeping —
+            // a value-bearing probe from an unfunded (e.g. default zero) address
+            // must still simulate, matching standard eth_call semantics.
             cfg.disable_nonce_check = true;
+            cfg.disable_balance_check = true;
         })
         .modify_block_chained(|b| *b = block_env(head.number, head.timestamp))
         .build_mainnet();

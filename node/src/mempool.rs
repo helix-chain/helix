@@ -21,6 +21,8 @@ pub enum AdmitError {
     NonZeroFee,
     #[error("wrong chain id (expected {expected})")]
     ChainId { expected: u64 },
+    #[error("pre-EIP-155 transactions without a chain id are replay-unsafe and not accepted")]
+    MissingChainId,
     #[error("transaction type not supported on this devnet (EIP-4844 blob / EIP-7702 set-code)")]
     UnsupportedType,
     #[error("transaction rejected by security hook")]
@@ -61,13 +63,16 @@ impl Mempool {
             return Err(AdmitError::NonZeroFee);
         }
 
-        // Legacy pre-EIP-155 txs carry no chain id; everything else must match.
-        if let Some(id) = envelope.chain_id()
-            && id != self.chain_id
-        {
-            return Err(AdmitError::ChainId {
-                expected: self.chain_id,
-            });
+        // Require a matching EIP-155 chain id. Pre-155 legacy txs carry no chain
+        // id and are cross-chain replayable, so they are refused on this devnet.
+        match envelope.chain_id() {
+            Some(id) if id == self.chain_id => {}
+            Some(_) => {
+                return Err(AdmitError::ChainId {
+                    expected: self.chain_id,
+                });
+            }
+            None => return Err(AdmitError::MissingChainId),
         }
 
         let hash = *envelope.hash();
@@ -178,5 +183,32 @@ mod tests {
         assert_eq!(drained.len(), 1);
         assert_eq!(drained[0].hash, hash);
         assert!(pool.is_empty());
+    }
+
+    /// A pre-EIP-155 legacy tx (no chain id) — replay-unsafe, must be refused.
+    fn signed_legacy_no_chainid() -> TxEnvelope {
+        let signer: PrivateKeySigner = DEV_KEY_0.parse().expect("dev key");
+        let tx = TxLegacy {
+            chain_id: None,
+            nonce: 0,
+            gas_price: 0,
+            gas_limit: 21_000,
+            to: TxKind::Call(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8")),
+            value: U256::from(1u64),
+            input: Default::default(),
+        };
+        let sig = signer.sign_hash_sync(&tx.signature_hash()).expect("sign");
+        tx.into_signed(sig).into()
+    }
+
+    #[test]
+    fn pre_eip155_tx_rejected() {
+        let mut pool = Mempool::new(CHAIN_ID, Arc::new(PassthroughHook));
+        let result = pool.admit(signed_legacy_no_chainid());
+        assert!(matches!(result, Err(AdmitError::MissingChainId)));
+        assert!(
+            pool.is_empty(),
+            "replay-unsafe tx must never enter the queue"
+        );
     }
 }

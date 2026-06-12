@@ -118,6 +118,11 @@ touching callers.
   production with a warning log — `eth_sendRawTransaction` already returned
   the hash, but no receipt will ever appear; poll receipts with a timeout.
   The FIFO pool does not re-order by nonce.
-- EIP-4844 (blob) and EIP-7702 (set-code) transactions are rejected at
-  admission. Legacy/EIP-2930/EIP-1559 are executed, but access lists are
-  treated as gas hints only and receipts always report `"type": "0x0"`.
+- EIP-4844 (blob), EIP-7702 (set-code), and pre-EIP-155 (chain-id-less,
+  replay-unsafe) legacy transactions are rejected at admission. EIP-155
+  legacy / EIP-2930 / EIP-1559 are executed, but access lists are treated as
+  gas hints only and receipts always report `"type": "0x0"`.
+- The mempool duplicate guard only spans the current pending queue (one
+  block). A transaction resubmitted in a later block is re-admitted and then
+  dropped at execution by the nonce check — replay safety comes from the
+  nonce, not the duplicate gate.
