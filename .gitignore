@@ -32,3 +32,15 @@ p0a_verify_*.py
 ci_smoke_report_*.json
 proxy_fp_test_report_*.json
 node/target/
+
+# Gated immune-library data — the MOAT. NEVER push to public repo.
+# The public immune_library_500.json is the open SEED and stays public;
+# these patterns fence the continuously-growing, gated assets.
+# (See the disclosure-boundary policy under docs/.)
+_gated/
+immune_*live*.json
+immune_library_*_gated*.json
+*_telemetry_*.json
+signature_pipeline/
+scoring_weights*.json
+attack_replays_gated/

@@ -111,6 +111,8 @@ Recommendation: Add nonReentrant modifier or
 
 Each signature includes: 768-dim CodeBERT embedding, attack class, loss amount, contract address, TX hash, and source postmortem link.
 
+> **Open seed vs. living library.** The 500 signatures published here are an **open seed set (v0.1)** — use them, fork them, contribute to them. The moat is not this snapshot but the **continuously growing** library: new signatures mined from live detections and design-partner telemetry are maintained as a **gated service**, not committed to this public repo. *Fork the seed; you can't fork the live history.*
+
 ---
 
 ## ✅ Verification Results
