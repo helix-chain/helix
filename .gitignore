@@ -18,6 +18,7 @@ fp_test_runner.py
 docs/
 CLAUDE.md
 CODE_MAP.md
+AGENTS.md
 .claude/
 
 # Local marketing / screenshot assets (README does not reference them)
