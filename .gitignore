@@ -33,6 +33,10 @@ p0a_verify_*.py
 ci_smoke_report_*.json
 proxy_fp_test_report_*.json
 node/target/
+hpl/target/
+
+# HPL spike — local runtime ledger (never commit)
+hpl_ledger.json
 
 # Gated immune-library data — the MOAT. NEVER push to public repo.
 # The public immune_library_500.json is the open SEED and stays public;
