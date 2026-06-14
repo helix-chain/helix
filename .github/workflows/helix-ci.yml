@@ -2,7 +2,7 @@
 # Version: V1.0_202604120942
 # Trigger: push to main, pull requests
 # Structure: single workflow → single job → multi-step
-# Scope: smoke test + proxy FP suite (no Docker, no matrix, no deploy)
+# Scope: harness gate + secret scan + smoke test + proxy FP suite (no Docker, no matrix, no deploy)
 
 name: HELIX CI
 
@@ -27,6 +27,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      # --- Harness gate (deterministic checks + secret scan) — fail fast, before installs ---
+      - name: Harness deterministic checks (read-only)
+        run: python .ci/harness_check.py all --rules .ci/harness_rules.yaml --repo .
+
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .ci/gitleaks.toml
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
       # --- Cache Layer 1: pip packages ---
       - name: Cache pip

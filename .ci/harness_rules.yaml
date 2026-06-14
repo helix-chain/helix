@@ -1,0 +1,55 @@
+# harness_rules.yaml — HELIX public-repo harness gate rules.
+# Read by .ci/harness_check.py (read-only / stdlib). Flat schema only:
+# key -> scalar / list of strings. Parsed by PyYAML if present, else by the
+# built-in minimal parser in harness_check.py. This file is in the checker's
+# SELF_FILES set, so its own content never trips the forbidden/secret scans.
+
+is_public_repo: true            # public repo -> the ignore gate treats an
+                                # un-ignored sensitive path as FAIL (leak), not warn.
+
+# Sensitive / gated / internal paths that MUST stay .gitignored so a stray
+# `git add .` can never stage them onto the public repo. Each is verified by
+# `git check-ignore`; all listed here are already covered by the repo .gitignore
+# (gated immune-library moat + private entry docs + secrets).
+sensitive_paths:
+  - _gated/
+  - .env
+  - CLAUDE.md
+  - CODE_MAP.md
+  - AGENTS.md
+  - docs/
+  - .claude/
+  - hpl_ledger.json
+  - signature_pipeline/
+  - attack_replays_gated/
+
+# Filenames that, if STAGED, fail the gate outright (secrets / key material /
+# private entry docs). Catches `git add -f` of an otherwise-ignored file.
+forbidden_staged_names:
+  - ".env"
+  - ".env.*"
+  - "*.pem"
+  - "*.key"
+  - "id_rsa"
+  - "id_ed25519"
+  - "*.p12"
+  - "*.pfx"
+  - "CLAUDE.md"
+  - "CODE_MAP.md"
+  - "AGENTS.md"
+
+# Regexes that must not appear in staged diffs or tracked files (real key
+# material / service-role JWTs). Kept conservative so the gate passes on the
+# known-good tree and only fires on genuine leaks.
+#
+# NOTE on DEV_KEY_0: hpl/src/client.rs intentionally embeds the well-known
+# public Anvil/Foundry devnet account #0 key
+# (0xac0974...f2ff80) — a public test key, devnet-only, never real funds.
+# Do NOT add a bare 0x[0-9a-f]{64} pattern here (it would false-flag that key);
+# the built-in SECRET_RX also leaves it alone. Other real keys stay in scope.
+forbidden_patterns:
+  - "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+  - "service_role[\"']?\\s*[:=]\\s*[\"']?eyJ"
+
+# Optional required-content checks ("<relative file>::<regex>"). None for now.
+required_patterns: []

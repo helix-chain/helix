@@ -1,0 +1,21 @@
+# gitleaks config for the HELIX public repo.
+# Pointed at by the CI gitleaks step via GITLEAKS_CONFIG=.ci/gitleaks.toml.
+# Keeps ALL default gitleaks rules active; only allowlists the single
+# well-known public devnet key so it does not block CI.
+
+title = "HELIX gitleaks config"
+
+[extend]
+useDefault = true            # keep every default rule — do NOT relax other keys
+
+[allowlist]
+description = """
+Well-known PUBLIC Anvil/Foundry devnet account #0 private key. It is a public
+test key (address 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266), used only on the
+local HELIX devnet, never for real funds. Embedded intentionally in
+hpl/src/client.rs as DEV_KEY_0. Allowlisted by exact value only, so every other
+secret is still detected.
+"""
+regexes = [
+  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+]
