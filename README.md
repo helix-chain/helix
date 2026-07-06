@@ -109,7 +109,7 @@ Recommendation: Add nonReentrant modifier or
 | Rug Pull | 42 | Squid Game, AnubisDAO |
 | Integer Overflow | 40 | BEC Token, SMT |
 
-Each signature includes: 768-dim CodeBERT embedding, attack class, loss amount, contract address, TX hash, and source postmortem link.
+Each **seed signature** is a portable metadata record — id, attack class, chain, loss amount, vulnerable function, root cause, pattern keywords, remediation, and a public-postmortem source reference. The public seed JSON intentionally does **not** ship 768-dim CodeBERT vectors; embeddings can be generated from these metadata fields when building a local vector index or a gated runtime store. This keeps the open seed dependency-light and human-readable while preserving the distinction between the forkable seed and HELIX's future live/gated immune-memory pipeline.
 
 > **Open seed vs. living library.** The 500 signatures published here are an **open seed set (v0.1)** — use them, fork them, contribute to them. The moat is not this snapshot but the **continuously growing** library: new signatures mined from live detections and design-partner telemetry are maintained as a **gated service**, not committed to this public repo. *Fork the seed; you can't fork the live history.*
 

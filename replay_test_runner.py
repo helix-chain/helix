@@ -35,6 +35,15 @@ BEYOND_MVP = {"SIG-037", "SIG-038", "SIG-041", "SIG-042", "SIG-043"}
 
 
 def run_replay():
+    # Make stdout/stderr robust on non-UTF-8 consoles (e.g. Windows cp936/gbk)
+    # so the ✅/❌/⚠️/⬜ status markers below can never crash the run with a
+    # UnicodeEncodeError. Degrades unrepresentable chars to '?', never fails.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     print("=" * 60)
     print("  HELIX Attack Replay Verification")
     print("  50 Historical Attacks × mismatch_detector")

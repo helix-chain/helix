@@ -22,6 +22,29 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_CONTRACTS_DIR = os.path.join(SCRIPT_DIR, "proxy_fp_tests")
 FP_THRESHOLD = 0.10  # LOW ceiling; anything >= is a false positive
 
+# Canonical field the detector emits (see mismatch_detector.analyze_contract).
+# Reading any other key via dict.get(..., default) silently returns the default
+# and hides field-name drift — the exact class of bug behind commit 9ff61b7,
+# where a stale key made every scan score 0.0 with no error. extract_score()
+# fails LOUD instead, so this FP gate can never again silently "pass" on 0.0.
+SCORE_KEY = "overall_mismatch_score"
+
+
+def extract_score(result):
+    """Read the detector's score by its canonical key, failing loudly on drift.
+
+    Returns float. Raises KeyError if SCORE_KEY is absent so a renamed or dropped
+    scoring field trips a visible error instead of silently scoring 0.0 (which
+    would make this false-positive gate unable to ever fail). This is the
+    regression insurance mandated after 9ff61b7 (see AGENTS.md, ci-key-grep).
+    """
+    if SCORE_KEY not in result:
+        raise KeyError(
+            f"detector output missing '{SCORE_KEY}' (got keys: {sorted(result)}). "
+            "Possible scoring-field drift — see AGENTS.md 'cross-module field names'."
+        )
+    return float(result[SCORE_KEY])
+
 # Test manifest: filename, pattern_type, description, why_risky_for_detector
 TEST_MANIFEST = [
     {
@@ -83,13 +106,23 @@ def run_single_test(detector, filepath):
             source = f.read()
 
         result = detector.analyze_contract(source)
+        # Read the score by its canonical key; a missing key raises (caught below)
+        # so field drift surfaces as an ERROR, never a silent 0.0 that always PASSes.
+        score = extract_score(result)
+        # "flags" is not a detector output field; surface the real per-function
+        # attack classes instead (display only — the verdict uses `score`).
+        flags = [
+            f.get("attack_class")
+            for f in result.get("functions", [])
+            if f.get("attack_class")
+        ]
         elapsed = round(time.time() - start, 2)
 
         return {
             "status": "ok",
-            "score": result.get("risk_score", 0.0),
+            "score": score,
             "risk_level": result.get("risk_level", "UNKNOWN"),
-            "flags": result.get("flags", []),
+            "flags": flags,
             "elapsed_sec": elapsed,
         }
     except Exception as e:
@@ -102,6 +135,15 @@ def run_single_test(detector, filepath):
 
 
 def main():
+    # Make stdout/stderr robust on non-UTF-8 consoles (e.g. Windows cp936/gbk) so
+    # the box-drawing / warning markers below can never crash the run with a
+    # UnicodeEncodeError. Degrades unrepresentable chars to '?', never fails.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     json_mode = "--json" in sys.argv
     jst = timezone(timedelta(hours=9))
     run_time = datetime.now(jst).strftime("%Y%m%d%H%M")

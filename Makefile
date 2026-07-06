@@ -2,9 +2,12 @@
 # Version: V1.0_202604120942
 # Reference: Engineering Spec Section 2.2
 
-.PHONY: smoke-ci fp-proxy-ci check help
+.PHONY: contract-test smoke-ci fp-proxy-ci check help
 
 # --- CI Targets ---
+
+contract-test:  ## Detector output data-contract regression (no torch/transformers)
+	python test_output_contract.py
 
 smoke-ci:  ## Run CI smoke test (SafeToken→LOW, VulnerableVault→CRITICAL)
 	python ci_smoke_test.py
@@ -12,7 +15,7 @@ smoke-ci:  ## Run CI smoke test (SafeToken→LOW, VulnerableVault→CRITICAL)
 fp-proxy-ci:  ## Run Proxy/Diamond/CREATE2 FP test suite (6 contracts, all must PASS)
 	python proxy_fp_test_runner.py
 
-check: smoke-ci fp-proxy-ci  ## Run all CI checks (smoke + FP suite)
+check: contract-test smoke-ci fp-proxy-ci  ## Run all CI checks (contract + smoke + FP suite)
 	@echo "All CI checks passed."
 
 # --- Development Targets ---

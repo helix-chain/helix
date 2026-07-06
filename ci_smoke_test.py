@@ -34,6 +34,16 @@ TESTS = [
 
 
 def main():
+    # Make stdout/stderr robust on non-UTF-8 consoles (e.g. Windows cp936/gbk) so
+    # the ✅/❌/⚠ status markers below can never crash the run with a
+    # UnicodeEncodeError (which previously masked a real ERROR as a hard crash).
+    # Degrades unrepresentable chars to '?', never fails; needs no terminal change.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     json_mode = "--json" in sys.argv
     jst = timezone(timedelta(hours=9))
     run_time = datetime.now(jst).strftime("%Y%m%d%H%M")
@@ -62,13 +72,17 @@ def main():
         start = time.time()
         try:
             res = mismatch_detector.analyze_contract(source)
+            # Fail loud on scoring-field drift: read the canonical score key by
+            # subscript (never .get(..., 0.0)) so a missing/renamed field raises
+            # here and lands in the error path below, instead of silently scoring
+            # 0.0 — the exact 9ff61b7 silent-failure class this guards against.
+            score = res["overall_mismatch_score"]
             elapsed = round(time.time() - start, 2)
         except Exception as e:
             results.append({"file": t["file"], "status": "error", "error": str(e), "elapsed_sec": round(time.time() - start, 2)})
             all_pass = False
             continue
 
-        score = res.get("overall_mismatch_score", 0.0)
         level = res.get("risk_level", "UNKNOWN")
         passed = True
         reason = ""

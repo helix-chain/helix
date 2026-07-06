@@ -56,6 +56,10 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements-ci.txt
 
+      # --- Test Step 0: Output data-contract regression (fast, catches field drift) ---
+      - name: Output data-contract regression test
+        run: make contract-test
+
       # --- Test Step 1: Smoke ---
       - name: Smoke test
         run: make smoke-ci
