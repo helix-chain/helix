@@ -6,7 +6,9 @@ Tests mismatch_detector against 4 real mainnet production contracts.
 Validates that the detector does NOT produce false positives on safe blue-chip contracts.
 
 Usage:  python mainnet_test_runner.py
-Output: Console report + mainnet_test_log.json
+Output: Console report + mainnet_test_log_<JST>.json (timestamped, append-only —
+        the old fixed name mainnet_test_log.json was overwrite-on-run and lost
+        the prior PASS evidence on 2026-07-04; historical files are never deleted)
 
 Acceptance criteria:
   HARD GATE:  All 4 contracts must NOT produce HIGH or CRITICAL
@@ -19,7 +21,7 @@ import sys
 import time
 import os
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # ─────────────────────────────────────────────
 # Imports
@@ -323,7 +325,10 @@ def run_tests():
         "results": results,
     }
 
-    log_file = "mainnet_test_log.json"
+    # Timestamped (JST) so each run appends to local history instead of
+    # overwriting the previous evidence (matches the other runners' pattern).
+    _jst_ts = datetime.now(timezone(timedelta(hours=9))).strftime("%Y%m%d%H%M")
+    log_file = f"mainnet_test_log_{_jst_ts}.json"
     try:
         with open(log_file, "w", encoding="utf-8") as f:
             json.dump(log_data, f, indent=2, ensure_ascii=False)

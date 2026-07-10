@@ -22,6 +22,8 @@ sensitive_paths:
   - hpl_ledger.json
   - signature_pipeline/
   - attack_replays_gated/
+  - 30_outputs/
+  - .relay/
 
 # Filenames that, if STAGED, fail the gate outright (secrets / key material /
 # private entry docs). Catches `git add -f` of an otherwise-ignored file.
