@@ -78,3 +78,44 @@ jobs:
             ci_smoke_report_*.json
             proxy_fp_test_report_*.json
           retention-days: 7
+
+  # Rust crates (node/ + hpl/) are public and runnable but had no CI coverage
+  # (flagged P2 in the 2026-06-14 independent review). Separate job so the
+  # Python regression gate above stays untouched.
+  rust-guard:
+    name: Rust Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain info
+        run: rustup show && cargo --version
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            node/target
+            hpl/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('node/Cargo.lock', 'hpl/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: node — fmt / clippy / test
+        working-directory: node
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: hpl — fmt / clippy / test (boots node in-process)
+        working-directory: hpl
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
