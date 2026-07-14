@@ -2,7 +2,7 @@
 # Version: V1.0_202604120942
 # Trigger: push to main, pull requests
 # Structure: single workflow → single job → multi-step
-# Scope: smoke test + proxy FP suite (no Docker, no matrix, no deploy)
+# Scope: harness gate + smoke test + proxy FP suite (no Docker, no matrix, no deploy)
 
 name: HELIX CI
 
@@ -28,6 +28,10 @@ jobs:
         with:
           python-version: "3.11"
 
+      # --- Harness gate (deterministic, read-only) — fail fast, before installs ---
+      - name: Harness deterministic checks (read-only)
+        run: python .ci/harness_check.py all --rules .ci/harness_rules.yaml --repo .
+
       # --- Cache Layer 1: pip packages ---
       - name: Cache pip
         uses: actions/cache@v4
@@ -51,6 +55,10 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements-ci.txt
+
+      # --- Test Step 0: Output data-contract regression (fast, catches field drift) ---
+      - name: Output data-contract regression test
+        run: make contract-test
 
       # --- Test Step 1: Smoke ---
       - name: Smoke test

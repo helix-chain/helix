@@ -1,7 +1,13 @@
 # requirements-ci.txt
 # HELIX CI dependencies — CPU-only PyTorch for lightweight CI
-# Version: V1.0_202604120942
+# Version: V1.1_202607110004
+#
+# Pinned 2026-07: the proxy-FP gate has a threshold-edge score (0.1007 vs the
+# 0.10 gate), so unpinned upstream torch/transformers upgrades could flip CI
+# with no repo change. These are the exact versions the 2026-07-06 CI run
+# resolved (run 28805089505) and the versions the 2026-07-10 re-validation
+# reproduced to 4 decimal places. Bump deliberately, never implicitly.
 
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch
-transformers
+torch==2.12.1
+transformers==5.13.0

@@ -1,3 +1,24 @@
+"""DEPRECATED / DANGEROUS — DO NOT RUN.
+
+One-shot 2026-04 migration script, retained only as historical record.
+Running it attempts to rewrite mismatch_detector.py's per-function scoring to a
+MAX-based formula (``max(base_score, pattern_boost) * amplifier``), which
+AGENTS.md §3 explicitly FORBIDS — the fixed, correct formula is additive
+``(base + boost) * amp``. The ``old`` pattern below no longer matches the
+current detector, so today this is a no-op, but it must never be executed and is
+not a live "fix-scoring" module. See CODE_MAP.md and AGENTS.md §3.
+"""
+import os
+import sys
+
+if os.environ.get("HELIX_ALLOW_LEGACY_PATCH") != "1":
+    print(
+        "[fix_score.py] DEPRECATED one-shot migration - refusing to run "
+        "(it would revert scoring to a FORBIDDEN max-based formula). "
+        "Retained for history only; this is not a live fix-scoring module."
+    )
+    sys.exit(0)
+
 with open("mismatch_detector.py", "r", encoding="utf-8") as f:
     code = f.read()
 

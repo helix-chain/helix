@@ -1,4 +1,21 @@
+"""DEPRECATED / DANGEROUS — DO NOT RUN.
+
+One-shot 2026-04 migration script, retained only as historical record.
+Running it rewrites the IntentExtractor block inside mismatch_detector.py via a
+hardcoded search-and-replace. The ``old`` pattern below no longer matches the
+current detector, so today this is a no-op, but it must never be executed and is
+not a live module. See CODE_MAP.md and AGENTS.md §3.
+"""
+import os
 import re
+import sys
+
+if os.environ.get("HELIX_ALLOW_LEGACY_PATCH") != "1":
+    print(
+        "[fix_extractor.py] DEPRECATED one-shot migration - refusing to run. "
+        "Retained for history only; this is not a live module."
+    )
+    sys.exit(0)
 
 with open("mismatch_detector.py", "r", encoding="utf-8") as f:
     code = f.read()
