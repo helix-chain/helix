@@ -1,0 +1,5 @@
+# Shell scripts and the git hook MUST stay LF: a CRLF shebang (`#!/bin/sh\r`)
+# is an invalid interpreter on Linux/CI (dash), silently breaking the harness
+# gate. Pin them regardless of a committer's core.autocrlf setting.
+*.sh text eol=lf
+/.ci/pre-commit text eol=lf

@@ -2,7 +2,7 @@
 # Version: V1.0_202604120942
 # Reference: Engineering Spec Section 2.2
 
-.PHONY: contract-test smoke-ci fp-proxy-ci check help
+.PHONY: contract-test smoke-ci fp-proxy-ci check help install-hooks
 
 # --- CI Targets ---
 
@@ -25,6 +25,9 @@ scan:  ## Scan a single file: make scan FILE=contract.sol
 
 scan-json:  ## Scan with JSON output: make scan-json FILE=contract.sol
 	python helix_scan.py --json $(FILE)
+
+install-hooks:  ## Install the harness pre-commit hook from tracked .ci/pre-commit
+	sh .ci/install-hooks.sh
 
 # --- Help ---
 
