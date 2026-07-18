@@ -2,7 +2,7 @@
 # Version: V1.0_202604120942
 # Trigger: push to main, pull requests
 # Structure: single workflow → single job → multi-step
-# Scope: harness gate + smoke test + proxy FP suite (no Docker, no matrix, no deploy)
+# Scope: harness gate + harness self-test + smoke test + proxy FP suite (no Docker, no matrix, no deploy)
 
 name: HELIX CI
 
@@ -31,6 +31,12 @@ jobs:
       # --- Harness gate (deterministic, read-only) — fail fast, before installs ---
       - name: Harness deterministic checks (read-only)
         run: python .ci/harness_check.py all --rules .ci/harness_rules.yaml --repo .
+
+      # --- Harness gate self-test (stdlib-only probe; proves the gate bites) ---
+      # Runs before installs: it needs neither torch nor transformers, and a gate
+      # that never proves it fires on bad input is a false sense of safety.
+      - name: Harness gate self-test (probe)
+        run: make harness-selftest
 
       # --- Cache Layer 1: pip packages ---
       - name: Cache pip

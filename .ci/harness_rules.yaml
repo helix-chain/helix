@@ -39,6 +39,16 @@ forbidden_staged_names:
   - "CLAUDE.md"
   - "CODE_MAP.md"
   - "AGENTS.md"
+  # --- HELIX-specific: gated immune-library MOAT + runtime ledger ---------
+  # These are the .gitignore'd gated assets (disclosure-boundary policy). The
+  # `ignore` gate above proves they stay ignored; these names additionally
+  # hard-fail a `git add -f` that force-stages one past .gitignore. None are
+  # currently tracked (verified), so this is zero-false-positive.
+  - "immune_*live*.json"
+  - "immune_library_*_gated*.json"
+  - "*_telemetry_*.json"
+  - "scoring_weights*.json"
+  - "hpl_ledger.json"
 
 # Regexes that must not appear in staged diffs or tracked files (real key
 # material / service-role JWTs). Kept conservative so the gate passes on the
@@ -51,7 +61,41 @@ forbidden_staged_names:
 # the built-in SECRET_RX also leaves it alone. Other real keys stay in scope.
 forbidden_patterns:
   - "-----BEGIN [A-Z ]*PRIVATE KEY-----"
-  - "service_role[\"']?\\s*[:=]\\s*[\"']?eyJ"
+  # service_role JWT. Single-quoted YAML with \x27 for the embedded single quote
+  # so BOTH parser paths agree: the built-in minimal parser (used in CI, which
+  # runs before PyYAML is installed) does NOT process YAML escapes, so a
+  # double-quoted "\\s" degraded to a literal backslash+s there and the rule
+  # silently never fired. In a single-quoted scalar neither PyYAML nor the
+  # minimal parser touch the backslashes, so `\s` reaches `re` intact under both;
+  # \x27 avoids a literal ' that would otherwise need parser-divergent escaping.
+  - 'service_role["\x27]?\s*[:=]\s*["\x27]?eyJ'
+  # --- HELIX-specific: hosted-RPC provider URL carrying an embedded key ----
+  # A crypto project's #1 accidental-leak vector (AGENTS.md §8: no RPC URL with
+  # API key in the repo). Targets provider hosts + a >=12-char path key; does
+  # NOT match localhost devnet URLs (http://127.0.0.1:8545) or the public
+  # helix-foundation.com site. Single-quoted YAML so backslashes stay literal.
+  # Verified zero matches across tracked files.
+  # NOTE (docs authors): a spelled-out placeholder like .../v3/YOUR-API-KEY is
+  # >=12 url-safe chars and WILL trip this gate. When documenting RPC config,
+  # use an angle-bracket placeholder — .../v3/<API_KEY> — the '<' breaks the
+  # key char-class so it does not fire.
+  - 'https?://[A-Za-z0-9.-]*(?:infura\.io|alchemy\.com|quiknode\.pro|quicknode\.com|ankr\.com|chainstack\.com|blastapi\.io)/[A-Za-z0-9/_-]{12,}'
 
-# Optional required-content checks ("<relative file>::<regex>"). None for now.
-required_patterns: []
+# Required-content checks ("<relative file>::<regex>") — the file MUST contain
+# the regex, else the gate fails. HELIX-specific: this is the ci-key-grep /
+# 9ff61b7 lesson ("risk_score" vs "overall_mismatch_score" silent-0.0 drift)
+# encoded at the DETERMINISTIC layer — it fires in CI's first step, before any
+# torch/transformers install, so a renamed/dropped canonical scoring key trips
+# a visible red BEFORE the (heavier) Python output-contract test even runs.
+# Complements test_output_contract.py, does not replace it.
+#
+# The mismatch_detector anchor is tightened to the EMISSION site (quoted key +
+# colon) rather than a bare-substring occurrence: the token appears 5x in that
+# file (dataclass field, ctor, output dict), so a bare substring would still
+# pass if only the emitted output key were renamed while the field name stayed.
+# Anchoring to `"overall_mismatch_score":` guards the actual output surface.
+# proxy_fp_test_runner.py has the token exactly once (SCORE_KEY = "..."), so a
+# bare-substring anchor there already trips on any rename.
+required_patterns:
+  - 'mismatch_detector.py::"overall_mismatch_score"\s*:'
+  - 'proxy_fp_test_runner.py::overall_mismatch_score'

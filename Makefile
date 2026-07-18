@@ -2,7 +2,7 @@
 # Version: V1.0_202604120942
 # Reference: Engineering Spec Section 2.2
 
-.PHONY: contract-test smoke-ci fp-proxy-ci check help
+.PHONY: contract-test smoke-ci fp-proxy-ci harness-selftest check help install-hooks
 
 # --- CI Targets ---
 
@@ -15,7 +15,10 @@ smoke-ci:  ## Run CI smoke test (SafeToken→LOW, VulnerableVault→CRITICAL)
 fp-proxy-ci:  ## Run Proxy/Diamond/CREATE2 FP test suite (6 contracts, all must PASS)
 	python proxy_fp_test_runner.py
 
-check: contract-test smoke-ci fp-proxy-ci  ## Run all CI checks (contract + smoke + FP suite)
+harness-selftest:  ## Prove the harness gate bites (no torch; temp-repo probes)
+	python test_harness_gate.py
+
+check: harness-selftest contract-test smoke-ci fp-proxy-ci  ## Run all CI checks (harness self-test + contract + smoke + FP)
 	@echo "All CI checks passed."
 
 # --- Development Targets ---
@@ -25,6 +28,9 @@ scan:  ## Scan a single file: make scan FILE=contract.sol
 
 scan-json:  ## Scan with JSON output: make scan-json FILE=contract.sol
 	python helix_scan.py --json $(FILE)
+
+install-hooks:  ## Install the harness pre-commit hook from tracked .ci/pre-commit
+	sh .ci/install-hooks.sh
 
 # --- Help ---
 

@@ -1,0 +1,28 @@
+#!/bin/sh
+# HELIX harness gate — pre-commit hook (TRACKED SOURCE).
+#
+# .git/hooks/ is not version-controlled, so THIS tracked copy is the reproducible
+# source of truth. A fresh clone installs it into place with:
+#     sh .ci/install-hooks.sh      (or, where make is available: make install-hooks)
+#
+# Bypassable with `git commit --no-verify` -> the CI required check is the hard
+# gate that cannot be bypassed. This local hook is only the fast first line.
+root="$(git rev-parse --show-toplevel)"
+if [ ! -f "$root/.ci/harness_check.py" ]; then
+  echo "[harness] .ci/harness_check.py not found — skipping local gate (CI still enforces)."
+  exit 0
+fi
+# Resolve python (fresh Linux clones often expose only python3, not python).
+py="$(command -v python3 || command -v python || true)"
+if [ -z "$py" ]; then
+  echo "[harness] no python3/python on PATH — skipping local gate (CI still enforces)." >&2
+  exit 0
+fi
+"$py" "$root/.ci/harness_check.py" all --rules "$root/.ci/harness_rules.yaml" --repo "$root"
+if [ $? -ne 0 ]; then
+  echo "" >&2
+  echo "[harness] pre-commit gate FAILED — fix the violations above." >&2
+  echo "          (bypass with --no-verify if intentional; CI required check will still block.)" >&2
+  exit 1
+fi
+exit 0
