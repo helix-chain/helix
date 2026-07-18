@@ -61,7 +61,14 @@ forbidden_staged_names:
 # the built-in SECRET_RX also leaves it alone. Other real keys stay in scope.
 forbidden_patterns:
   - "-----BEGIN [A-Z ]*PRIVATE KEY-----"
-  - "service_role[\"']?\\s*[:=]\\s*[\"']?eyJ"
+  # service_role JWT. Single-quoted YAML with \x27 for the embedded single quote
+  # so BOTH parser paths agree: the built-in minimal parser (used in CI, which
+  # runs before PyYAML is installed) does NOT process YAML escapes, so a
+  # double-quoted "\\s" degraded to a literal backslash+s there and the rule
+  # silently never fired. In a single-quoted scalar neither PyYAML nor the
+  # minimal parser touch the backslashes, so `\s` reaches `re` intact under both;
+  # \x27 avoids a literal ' that would otherwise need parser-divergent escaping.
+  - 'service_role["\x27]?\s*[:=]\s*["\x27]?eyJ'
   # --- HELIX-specific: hosted-RPC provider URL carrying an embedded key ----
   # A crypto project's #1 accidental-leak vector (AGENTS.md §8: no RPC URL with
   # API key in the repo). Targets provider hosts + a >=12-char path key; does

@@ -1,6 +1,6 @@
 """
 test_harness_gate.py
-Version: V1.1
+Version: V1.2
 
 Probe self-test for the deterministic harness gate (.ci/harness_check.py +
 .ci/harness_rules.yaml). Proves the gate actually BITES: dangerous staged
@@ -179,6 +179,50 @@ class HarnessGateProbe(unittest.TestCase):
             shutil.rmtree(shim, ignore_errors=True)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("overall_mismatch_score", out)
+
+    # --- service_role secret rule, under BOTH parser paths ----------------
+
+    def _seed_canonical_keys(self):
+        """Stage the canonical-key anchor files so a `grep` run's only possible
+        failure is the forbidden_pattern under test, not a required_pattern miss."""
+        self._write("mismatch_detector.py", 'def a():\n    return {"overall_mismatch_score": 0.0}\n')
+        self._write("proxy_fp_test_runner.py", 'SCORE_KEY = "overall_mismatch_score"\n')
+        self._stage("mismatch_detector.py")
+        self._stage("proxy_fp_test_runner.py")
+
+    def _service_role_line(self):
+        """A service_role JWT assignment, assembled at runtime so this test file
+        carries no scannable literal (it must not trip the very rule it tests)."""
+        return "service_role" + ": " + "eyJ" + "hbGciOiJIUzI1NiJ9.cGF5bG9hZA.c2ln\n"
+
+    def test_service_role_secret_in_tracked_file_fails(self):
+        """A service_role JWT in a tracked file must fail grep (default parser)."""
+        self._seed_canonical_keys()
+        self._write("creds.txt", self._service_role_line())
+        self._stage("creds.txt")
+        rc, out = _run_gate(self.repo, "grep")
+        self.assertEqual(rc, 1, f"expected FAIL on service_role secret; out=\n{out}")
+        self.assertIn("service_role", out)
+
+    def test_service_role_secret_caught_under_minimal_parser(self):
+        """The same catch must hold under the no-PyYAML minimal parser (CI's real
+        path). This is the exact regression the parser-stability fix closes: the
+        old double-quoted rule degraded to a literal-backslash pattern here and
+        silently never fired."""
+        self._seed_canonical_keys()
+        self._write("creds.txt", self._service_role_line())
+        self._stage("creds.txt")
+        shim = tempfile.mkdtemp(prefix="helix_noyaml_")
+        try:
+            with open(os.path.join(shim, "yaml.py"), "w", encoding="utf-8") as f:
+                f.write('raise ImportError("forced no-yaml for probe")\n')
+            env = dict(os.environ)
+            env["PYTHONPATH"] = shim + os.pathsep + env.get("PYTHONPATH", "")
+            rc, out = _run_gate(self.repo, "grep", extra_env=env)
+        finally:
+            shutil.rmtree(shim, ignore_errors=True)
+        self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
+        self.assertIn("service_role", out)
 
     # --- negative controls: clean content must PASS (exit 0) --------------
 
