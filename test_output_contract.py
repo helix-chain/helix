@@ -26,10 +26,15 @@ fast, dependency-light gate suitable for pre-commit and CI.
 Run:  python test_output_contract.py
 """
 
+import contextlib
+import io
+import json
 import os
 import re
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
@@ -38,6 +43,7 @@ import numpy as np
 
 import mismatch_detector as md
 import proxy_fp_test_runner as pf
+import helix_scan
 
 # A contract whose comments claim safety while the code has a reentrancy CEI
 # violation — exercises the additive pattern boost path in the real detector.
@@ -142,6 +148,114 @@ class TestOutputContract(unittest.TestCase):
         self.assertEqual(
             offenders, [],
             f"unsafe score reads in active runner(s): {offenders}",
+        )
+
+
+def _valid_result(risk_level="LOW", **overrides):
+    """Build a well-formed analyze_contract() output dict, then apply overrides."""
+    result = {
+        "risk_level": risk_level,
+        "overall_mismatch_score": 0.5,
+        "functions": [],
+        "recommended_action": "x",
+        "contract_address": None,
+    }
+    result.update(overrides)
+    return result
+
+
+class TestCliExitContract(unittest.TestCase):
+    """The CLI must fail LOUD (exit 2) when the detector output contract drifts.
+
+    9ff61b7-class field drift: if analyze_contract() ever drops `risk_level`,
+    `main()` used `result.get("risk_level", "LOW")` and exited 0 = "safe to
+    proceed" even for a CRITICAL contract.  Any value outside
+    LOW/MEDIUM/HIGH/CRITICAL also exited 0.  In human mode a missing key raised
+    an uncaught KeyError -> exit 1, which means "HIGH/CRITICAL", not "error".
+    Validation must happen right after analyze_contract() returns and BEFORE any
+    output, so a drifted result exits 2 with nothing on stdout.
+    """
+
+    def setUp(self):
+        # One-line .sol file written via tempfile (never into the source dir).
+        fd, self._sol_path = tempfile.mkstemp(suffix=".sol")
+        os.close(fd)
+        with open(self._sol_path, "w", encoding="utf-8") as f:
+            f.write("pragma solidity ^0.8.0;\ncontract C {}\n")
+        self.addCleanup(os.remove, self._sol_path)
+
+    def _run_cli(self, result, json_mode):
+        """Drive helix_scan.main() in-process with a stubbed detector."""
+        argv = ["helix_scan.py", "scan", self._sol_path]
+        if json_mode:
+            argv.append("--json")
+        out, err = io.StringIO(), io.StringIO()
+        code = None
+        with mock.patch.object(helix_scan, "analyze_contract", return_value=result), \
+                mock.patch.object(sys, "argv", argv), \
+                contextlib.redirect_stdout(out), \
+                contextlib.redirect_stderr(err):
+            try:
+                helix_scan.main()
+            except SystemExit as e:
+                code = e.code
+        return code, out.getvalue(), err.getvalue()
+
+    # -- drift / invalid-value cases -------------------------------------
+    def test_drift_json_missing_risk_level_exits_2(self):
+        result = _valid_result("CRITICAL")
+        del result["risk_level"]
+        code, out, err = self._run_cli(result, json_mode=True)
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("[ERROR]", err)
+        self.assertIn("risk_level", err)
+
+    def test_drift_human_missing_risk_level_exits_2(self):
+        result = _valid_result("CRITICAL")
+        del result["risk_level"]
+        code, out, err = self._run_cli(result, json_mode=False)
+        self.assertEqual(code, 2)
+        self.assertNotIn("HELIX Scan Result", out)
+
+    def test_invalid_value_json_exits_2(self):
+        code, out, err = self._run_cli(_valid_result("UNKNOWN"), json_mode=True)
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+
+    def test_drift_json_missing_score_exits_2(self):
+        result = _valid_result("CRITICAL")
+        del result["overall_mismatch_score"]
+        code, out, err = self._run_cli(result, json_mode=True)
+        self.assertEqual(code, 2)
+
+    # -- positive controls: a valid result keeps today's exit codes -------
+    def test_positive_controls_json(self):
+        for risk, expected in (("LOW", 0), ("MEDIUM", 0), ("HIGH", 1), ("CRITICAL", 1)):
+            with self.subTest(risk=risk):
+                code, out, err = self._run_cli(_valid_result(risk), json_mode=True)
+                self.assertEqual(code, expected)
+                payload = json.loads(out)
+                self.assertEqual(payload["risk_level"], risk)
+
+    def test_positive_controls_human(self):
+        for risk, expected in (("LOW", 0), ("MEDIUM", 0), ("HIGH", 1), ("CRITICAL", 1)):
+            with self.subTest(risk=risk):
+                code, out, err = self._run_cli(_valid_result(risk), json_mode=False)
+                self.assertEqual(code, expected)
+                self.assertIn("HELIX Scan Result", out)
+
+    # -- static: the CLI must not read risk_level with a masking default --
+    def test_cli_reads_risk_level_fail_loud(self):
+        """helix_scan.py must not read risk_level via .get(key, <default>)."""
+        soft_default = re.compile(r"""\.get\(\s*['"]risk_level['"]\s*,""")
+        path = os.path.join(SCRIPT_DIR, "helix_scan.py")
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        self.assertIsNone(
+            soft_default.search(src),
+            "helix_scan.py reads risk_level with a default - soft value masks "
+            "field drift (read by subscript after validation instead)",
         )
 
 
