@@ -129,3 +129,18 @@ required_patterns:
   - 'mainnet_test_runner.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
   - 'ci_smoke_test.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
   - 'helix_scan.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
+#
+# --- P1-1 fix (added 2026-10-13): the SERIALIZATION read of the score -------
+# mismatch_detector.py L512, inside analyze_contract():
+#     "overall_mismatch_score": round(report.overall_mismatch_score, 4),
+# This is the serialization read inside analyze_contract(); the value every
+# dict consumer receives (mainnet/ci_smoke/helix_scan/proxy) comes through
+# this one line. It is the only attribute read of report.overall_mismatch_score
+# in the file (L394/404/490 are constructor keyword arguments). Without this
+# anchor the soft-default drift round(getattr(report, "risk_score", 0.0), 4)
+# would silently default the emitted score to 0.0 while BOTH the dataclass
+# field and the emitted dict key stayed present — every consumer would read a
+# wrong-but-well-formed 0.0 and no other anchor would fire. The (?m)^[^\x23\n]*
+# prefix (no '#' before the match) keeps a commented-out read from satisfying
+# the gate; \x23 avoids a literal '#'.
+  - 'mismatch_detector.py::(?m)^[^\x23\n]*\breport\.overall_mismatch_score\b'
