@@ -12,7 +12,7 @@ contract-test:  ## Detector output data-contract regression (no torch/transforme
 smoke-ci:  ## Run CI smoke test (SafeToken→LOW, VulnerableVault→CRITICAL)
 	python ci_smoke_test.py
 
-fp-proxy-ci:  ## Run Proxy/Diamond/CREATE2 FP test suite (6 contracts, all must PASS)
+fp-proxy-ci:  ## Run Proxy/Diamond/CREATE2 FP test suite (6 contracts; exit 0 = no NEW false positive, 2 known FPs baselined)
 	python proxy_fp_test_runner.py
 
 harness-selftest:  ## Prove the harness gate bites (no torch; temp-repo probes)
