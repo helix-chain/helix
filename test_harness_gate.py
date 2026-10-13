@@ -1,6 +1,6 @@
 """
 test_harness_gate.py
-Version: V1.2
+Version: V1.3
 
 Probe self-test for the deterministic harness gate (.ci/harness_check.py +
 .ci/harness_rules.yaml). Proves the gate actually BITES: dangerous staged
@@ -15,17 +15,33 @@ CI as its own step (see the Makefile `harness-selftest` target); until then it
 is runnable directly. It exercises the SHIPPED checker + SHIPPED rules (invoked
 by their real repo paths against throwaway temp git repos), so it also
 regression-guards the helix-specific rules (gated-file names, RPC-key pattern,
-canonical-score-key required_pattern) and the no-PyYAML minimal-parser path that
+canonical-score-key required_patterns) and the no-PyYAML minimal-parser path that
 CI actually uses (the gate runs before torch/transformers are installed).
 
 Every FAIL test asserts a rule-specific token in the output, not merely a
 non-zero exit code, so a checker that fails for an UNRELATED reason (a crash, an
 argparse error) cannot masquerade as a passing probe.
 
+V1.3 additions (M2 hardening — consumer read-site anchors)
+----------------------------------------------------------
+The required_patterns list grew five entries (see .ci/harness_rules.yaml). Two
+things follow, and both are tested here:
+
+  * Every probe that seeds a subset of the anchored files would now fail for the
+    WRONG reason (a missing peer file), so `_seed_canonical_keys()` seeds ALL
+    anchored files from a single minimal-seed dict (`MINIMAL_SEEDS`).
+  * A synthetic mini-file can show the regex compiles; it cannot show the regex
+    matches the REAL code. `RealTreeAnchorProbe` therefore copies the REAL
+    consumer files into a temp git repo and drives the shipped checker over
+    them: a positive control (unmodified real copies -> rc 0) plus one bait per
+    anchor. Each bait replaces the real read site with a drift/soft-default form
+    and must flip the gate red, naming EXACTLY the mutated file.
+
 Run:  python test_harness_gate.py
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +59,91 @@ GITIGNORE = "\n".join([
     ".claude/", "hpl_ledger.json", "signature_pipeline/", "attack_replays_gated/",
     "30_outputs/", ".relay/", "",
 ])
+
+# --- minimal valid seed for EVERY file carrying a required_pattern ----------
+# One place only: a probe that seeds a subset fails for a reason it did not
+# intend (an unseeded *peer* anchor), which is a false red and hides the bait.
+# Keys are the rule file names; values are minimal content that satisfies each
+# anchor's access form (dataclass field / attribute read / quoted dict
+# subscript). Add a key here whenever a new required_patterns entry is added.
+MINIMAL_SEEDS = {
+    "mismatch_detector.py": 'def a():\n    return {"overall_mismatch_score": 0.0}\n',
+    "proxy_fp_test_runner.py": 'SCORE_KEY = "overall_mismatch_score"\n',
+    "replay_test_runner.py": "score = report.overall_mismatch_score\n",
+    "mainnet_test_runner.py": 'score = result["overall_mismatch_score"]\n',
+    "ci_smoke_test.py": 'score = res["overall_mismatch_score"]\n',
+    "helix_scan.py": 'score = result["overall_mismatch_score"]\n',
+}
+
+# Seed that also carries the dataclass field line the mismatch_detector anchor
+# binds (the plain dict-key seed above satisfies the OLD emission anchor only).
+# The real line carries a trailing annotation comment; the anchor only needs
+# `overall_mismatch_score: float`, so the seed keeps a comment tail to mirror
+# the real file (and to prove the anchor is not fooled by a trailing comment).
+DATACLASS_FIELD_LINE = "    overall_mismatch_score: float          # 0.0 (aligned) \u2192 1.0 (severe mismatch)\n"
+MINIMAL_SEEDS["mismatch_detector.py"] = (
+    "from dataclasses import dataclass\n"
+    "@dataclass\n"
+    "class MismatchReport:\n"
+    + DATACLASS_FIELD_LINE
+    + 'def a():\n    return {"overall_mismatch_score": 0.0}\n'
+)
+
+# The real consumer files RealTreeAnchorProbe copies into its temp repo.
+REAL_CONSUMER_FILES = [
+    "mismatch_detector.py",
+    "replay_test_runner.py",
+    "mainnet_test_runner.py",
+    "ci_smoke_test.py",
+    "helix_scan.py",
+    "proxy_fp_test_runner.py",
+]
+
+# One bait per anchor: (file, exact text to replace, its occurrence count,
+# replacement, the one file the gate MUST name as `required 未满足: <file>`).
+BAITS = [
+    (
+        "mainnet_test_runner.py",
+        'score = result["overall_mismatch_score"]', 1,
+        'score = result["risk_score"]',
+        "mainnet_test_runner.py",
+    ),
+    (
+        "ci_smoke_test.py",
+        'score = res["overall_mismatch_score"]', 1,
+        'score = res.get("overall_mismatch_score", 0.0)',
+        "ci_smoke_test.py",
+    ),
+    (
+        "helix_scan.py",
+        'score = result["overall_mismatch_score"]', 1,
+        'score = result.get("overall_mismatch_score", 0.0)',
+        "helix_scan.py",
+    ),
+    (
+        "replay_test_runner.py",
+        "score = report.overall_mismatch_score", 1,
+        'score = getattr(report, "overall_mismatch_score", 0.0)',
+        "replay_test_runner.py",
+    ),
+    (
+        "replay_test_runner.py",
+        "score = report.overall_mismatch_score", 1,
+        "score = report.mismatch_score  # report.overall_mismatch_score",
+        "replay_test_runner.py",
+    ),
+    (
+        # The real tree is CRLF; this bait is EOL-agnostic (the `_mutate` hook
+        # below translates the bare \n to the file's own line ending).
+        "mismatch_detector.py",
+        DATACLASS_FIELD_LINE, 1,
+        DATACLASS_FIELD_LINE.replace("overall_mismatch_score", "mismatch_score"),
+        "mismatch_detector.py",
+        True,
+    ),
+]
+
+NOYAML_SHIM_BODY = 'raise ImportError("forced no-yaml for probe")\n'
 
 
 def _git(repo, *args):
@@ -66,6 +167,27 @@ def _run_gate(repo, cmd, extra_env=None):
         env=extra_env,
     )
     return proc.returncode, (proc.stdout + proc.stderr)
+
+
+def _noyaml_env():
+    """Return (env, shim_dir) forcing the checker's no-PyYAML minimal parser.
+
+    The shim dir holds a yaml.py that raises ImportError, so `import yaml`
+    inside _load_rules falls back to the built-in minimal parser — the path CI
+    really uses (the gate runs before PyYAML is installed). Caller removes
+    shim_dir in a finally block.
+    """
+    shim = tempfile.mkdtemp(prefix="helix_noyaml_")
+    with open(os.path.join(shim, "yaml.py"), "w", encoding="utf-8") as f:
+        f.write(NOYAML_SHIM_BODY)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = shim + os.pathsep + env.get("PYTHONPATH", "")
+    return env, shim
+
+
+def _missing_required(out):
+    """Set of rel paths the checker named as `required 未满足` (the FAIL lines)."""
+    return set(re.findall(r"required 未满足: (\S+)", out))
 
 
 class HarnessGateProbe(unittest.TestCase):
@@ -151,44 +273,52 @@ class HarnessGateProbe(unittest.TestCase):
     def test_grep_required_key_drift_fails(self):
         """Renaming the canonical scoring key must fail the required_pattern."""
         # Emit the wrong (legacy) key -> the emission-anchored required_pattern misses.
-        self._write("mismatch_detector.py", 'def a():\n    return {"risk_score": 0.0}\n')
-        self._write("proxy_fp_test_runner.py", 'SCORE_KEY = "overall_mismatch_score"\n')
+        self._seed_canonical_keys(overrides={
+            "mismatch_detector.py": 'def a():\n    return {"risk_score": 0.0}\n',
+        })
         self._stage("mismatch_detector.py")
-        self._stage("proxy_fp_test_runner.py")
         rc, out = _run_gate(self.repo, "grep")
         self.assertEqual(rc, 1, f"expected FAIL on canonical-key drift; out=\n{out}")
         self.assertIn("overall_mismatch_score", out)
+        # The failure must be attributed to the file this test broke, not a peer.
+        self.assertIn("required 未满足: mismatch_detector.py", out)
 
     def test_minimal_parser_catches_drift(self):
         """The no-PyYAML minimal parser (the actual CI path — the gate runs
         before torch/transformers/PyYAML are installed) must still parse the
         helix required_patterns and catch canonical-key drift."""
-        self._write("mismatch_detector.py", 'def a():\n    return {"risk_score": 0.0}\n')
-        self._write("proxy_fp_test_runner.py", 'SCORE_KEY = "overall_mismatch_score"\n')
+        self._seed_canonical_keys(overrides={
+            "mismatch_detector.py": 'def a():\n    return {"risk_score": 0.0}\n',
+        })
         self._stage("mismatch_detector.py")
-        self._stage("proxy_fp_test_runner.py")
-        # Shim that makes `import yaml` raise -> checker falls back to minimal parser.
-        shim = tempfile.mkdtemp(prefix="helix_noyaml_")
+        env, shim = _noyaml_env()
         try:
-            with open(os.path.join(shim, "yaml.py"), "w", encoding="utf-8") as f:
-                f.write('raise ImportError("forced no-yaml for probe")\n')
-            env = dict(os.environ)
-            env["PYTHONPATH"] = shim + os.pathsep + env.get("PYTHONPATH", "")
             rc, out = _run_gate(self.repo, "grep", extra_env=env)
         finally:
             shutil.rmtree(shim, ignore_errors=True)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("overall_mismatch_score", out)
+        self.assertIn("required 未满足: mismatch_detector.py", out)
 
     # --- service_role secret rule, under BOTH parser paths ----------------
 
-    def _seed_canonical_keys(self):
-        """Stage the canonical-key anchor files so a `grep` run's only possible
-        failure is the forbidden_pattern under test, not a required_pattern miss."""
-        self._write("mismatch_detector.py", 'def a():\n    return {"overall_mismatch_score": 0.0}\n')
-        self._write("proxy_fp_test_runner.py", 'SCORE_KEY = "overall_mismatch_score"\n')
-        self._stage("mismatch_detector.py")
-        self._stage("proxy_fp_test_runner.py")
+    def _seed_canonical_keys(self, overrides=None):
+        """Stage EVERY anchored file with minimal valid content, so a later
+        `grep` run's only possible failure is the one under test — not an
+        unfilled peer anchor (which would be a false red).
+
+        `overrides` replaces a seed by rule file name; a caller that seeds a
+        broken file writes it after staging the rest.
+        """
+        seeds = dict(MINIMAL_SEEDS)
+        seeds.update(overrides or {})
+        for rel in MINIMAL_SEEDS:          # stage the whole anchored set
+            if rel not in (overrides or {}):
+                self._write(rel, seeds[rel])
+                self._stage(rel)
+        if overrides:
+            for rel in overrides:
+                self._write(rel, overrides[rel])
 
     def _service_role_line(self):
         """A service_role JWT assignment, assembled at runtime so this test file
@@ -212,12 +342,8 @@ class HarnessGateProbe(unittest.TestCase):
         self._seed_canonical_keys()
         self._write("creds.txt", self._service_role_line())
         self._stage("creds.txt")
-        shim = tempfile.mkdtemp(prefix="helix_noyaml_")
+        env, shim = _noyaml_env()
         try:
-            with open(os.path.join(shim, "yaml.py"), "w", encoding="utf-8") as f:
-                f.write('raise ImportError("forced no-yaml for probe")\n')
-            env = dict(os.environ)
-            env["PYTHONPATH"] = shim + os.pathsep + env.get("PYTHONPATH", "")
             rc, out = _run_gate(self.repo, "grep", extra_env=env)
         finally:
             shutil.rmtree(shim, ignore_errors=True)
@@ -234,13 +360,159 @@ class HarnessGateProbe(unittest.TestCase):
         self.assertEqual(rc, 0, f"expected PASS on clean staged file; out=\n{out}")
 
     def test_clean_tree_passes_all(self):
-        """A tree with proper .gitignore + canonical keys must pass `all`."""
-        self._write("mismatch_detector.py", 'def a():\n    return {"overall_mismatch_score": 0.0}\n')
-        self._write("proxy_fp_test_runner.py", 'SCORE_KEY = "overall_mismatch_score"\n')
-        self._stage("mismatch_detector.py")
-        self._stage("proxy_fp_test_runner.py")
+        """A tree with proper .gitignore + ALL anchored files must pass `all`."""
+        self._seed_canonical_keys()
         rc, out = _run_gate(self.repo, "all")
         self.assertEqual(rc, 0, f"expected PASS on clean tree; out=\n{out}")
+
+
+class RealTreeAnchorProbe(unittest.TestCase):
+    """Drive the shipped checker over the REAL consumer files, not mini-files.
+
+    A synthetic seed proves a regex compiles and fires on invented text; it does
+    NOT prove the anchor matches the code that actually ships. This class copies
+    the real files into a fresh temp git repo and:
+
+      a) positive control — unmodified real copies must give rc 0, i.e. every
+         anchor in the shipped rules matches the shipped code;
+      b) one bait per anchor — each single-line drift/soft-default edit must
+         give rc 1 AND name EXACTLY the mutated file as `required 未满足: <f>`,
+         and no other file. Because each bait mutates ONE file, `missing` must
+         equal {mutated} exactly — a peer miss (a false red) fails the test.
+
+    Both parser paths are exercised: default (PyYAML when importable) and the
+    forced minimal parser (the CI path).
+    """
+
+    def setUp(self):
+        self.repo = tempfile.mkdtemp(prefix="helix_realtree_")
+        _git(self.repo, "init", "-q")
+        _git(self.repo, "config", "user.email", "probe@test.local")
+        _git(self.repo, "config", "user.name", "probe")
+        with open(os.path.join(self.repo, ".gitignore"), "w", encoding="utf-8",
+                  newline="\n") as f:
+            f.write(GITIGNORE)
+        for rel in REAL_CONSUMER_FILES:
+            src = os.path.join(SCRIPT_DIR, rel)
+            self.assertTrue(os.path.isfile(src), f"missing real file: {src}")
+            shutil.copyfile(src, os.path.join(self.repo, rel))
+        for rel in REAL_CONSUMER_FILES:
+            _git(self.repo, "add", "--", rel)
+
+    def tearDown(self):
+        shutil.rmtree(self.repo, ignore_errors=True)
+
+    def _path(self, rel):
+        return os.path.join(self.repo, rel)
+
+    def _read(self, rel):
+        with open(self._path(rel), "r", encoding="utf-8", newline="") as f:
+            return f.read()
+
+    def _write(self, rel, text):
+        with open(self._path(rel), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def _restore_all(self):
+        """Re-copy every real consumer file (undo a bait) and re-stage."""
+        for rel in REAL_CONSUMER_FILES:
+            shutil.copyfile(os.path.join(SCRIPT_DIR, rel), self._path(rel))
+            _git(self.repo, "add", "--", rel)
+
+    def _mutate(self, rel, old, count, new, eol_agnostic=False):
+        """Replace `old` with `new` in rel, asserting EXACTLY `count` hits first.
+
+        A count mismatch is a hard failure, never a silent skip: a bait that no
+        longer matches the real code would otherwise pass vacuously. With
+        `eol_agnostic` the bait strings use a bare \\n and are translated to the
+        file's own line ending before counting (the tracked tree is CRLF).
+        """
+        text = self._read(rel)
+        if eol_agnostic:
+            eol = "\r\n" if "\r\n" in text else "\n"
+            old = old.replace("\r\n", "\n").replace("\n", eol)
+            new = new.replace("\r\n", "\n").replace("\n", eol)
+        found = text.count(old)
+        self.assertEqual(
+            found, count,
+            f"bait text {old!r} occurs {found}x in {rel}, expected {count}x — "
+            f"the real read site drifted; update this probe (never skip it)",
+        )
+        self._write(rel, text.replace(old, new, count))
+        _git(self.repo, "add", "--", rel)
+
+    def _both_parsers(self):
+        """Yield (label, env) — default parser, then the forced minimal parser."""
+        yield "default", None
+        env, shim = _noyaml_env()
+        try:
+            yield "minimal", env
+        finally:
+            shutil.rmtree(shim, ignore_errors=True)
+
+    def test_a_positive_control_real_files_pass_both_parsers(self):
+        """(a) The unmodified REAL consumer files must satisfy every anchor."""
+        for label, env in self._both_parsers():
+            rc, out = _run_gate(self.repo, "grep", extra_env=env)
+            self.assertEqual(
+                rc, 0,
+                f"[{label} parser] anchors do NOT match the real tree; out=\n{out}",
+            )
+
+    def test_b_every_bait_flips_the_gate_red_on_exactly_its_file(self):
+        """(b) Each drift/soft-default bait must fail, naming only its own file."""
+        for label, env in self._both_parsers():
+            for bait in BAITS:
+                rel, old, count, new, expected = bait[:5]
+                ea = bait[5] if len(bait) > 5 else False
+                self._restore_all()
+                self._mutate(rel, old, count, new, ea)
+                rc, out = _run_gate(self.repo, "grep", extra_env=env)
+                tag = f"[{label} parser] bait in {rel}"
+                self.assertEqual(rc, 1, f"{tag}: expected FAIL; out=\n{out}")
+                self.assertIn("required 未满足", out, f"{tag}: no FAIL line; out=\n{out}")
+                self.assertIn(
+                    f"required 未满足: {expected}", out,
+                    f"{tag}: FAIL must name {expected}; out=\n{out}",
+                )
+                missing = _missing_required(out)
+                self.assertEqual(
+                    missing, {expected},
+                    f"{tag}: gate flagged {sorted(missing)}, expected only "
+                    f"[{expected}] — a peer anchor is a false red",
+                )
+
+    def test_b2_soft_default_baits_never_read_a_stale_or_defaulted_score(self):
+        """The `.get(..., 0.0)` baits are the exact 9ff61b7 silent-0.0 class; the
+        subscript anchors must reject them under both parsers."""
+        soft = [b for b in BAITS if ".get(" in b[3]]
+        self.assertGreaterEqual(len(soft), 2, "expected >=2 soft-default baits")
+        for label, env in self._both_parsers():
+            for bait in soft:
+                rel, old, count, new, expected = bait[:5]
+                ea = bait[5] if len(bait) > 5 else False
+                self._restore_all()
+                self._mutate(rel, old, count, new, ea)
+                rc, out = _run_gate(self.repo, "grep", extra_env=env)
+                self.assertEqual(
+                    rc, 1,
+                    f"[{label} parser] soft-default bait in {rel} stayed green "
+                    f"(silent-0.0 class); out=\n{out}",
+                )
+                self.assertEqual(_missing_required(out), {expected})
+
+    def test_b3_commented_correct_read_does_not_satisfy_the_anchor(self):
+        """A bait whose correct text survives ONLY inside a trailing comment must
+        still fail: `(?m)^[^\x23\n]*` requires the match on a comment-free line."""
+        bait = [b for b in BAITS if "# report.overall_mismatch_score" in b[3]][0]
+        rel, old, count, new, expected = bait[:5]
+        ea = bait[5] if len(bait) > 5 else False
+        for label, env in self._both_parsers():
+            self._restore_all()
+            self._mutate(rel, old, count, new, ea)
+            rc, out = _run_gate(self.repo, "grep", extra_env=env)
+            self.assertEqual(rc, 1, f"[{label} parser] commented read stayed green; out=\n{out}")
+            self.assertEqual(_missing_required(out), {expected})
 
 
 if __name__ == "__main__":

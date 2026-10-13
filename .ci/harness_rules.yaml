@@ -99,3 +99,33 @@ forbidden_patterns:
 required_patterns:
   - 'mismatch_detector.py::"overall_mismatch_score"\s*:'
   - 'proxy_fp_test_runner.py::overall_mismatch_score'
+#
+# --- Consumer read-site anchors (added 2026-10-13) ----------------------
+# The five entries below bind the access FORM each real consumer uses, not
+# merely the presence of the token. `(?m)^[^\x23\n]*` requires the match
+# to sit on a line with no '#' before it, so a commented-out copy of the
+# correct read does NOT satisfy the gate; \x23 avoids a literal '#' (the
+# minimal parser cuts every line at the FIRST '#', and this file must stay
+# single-quote-safe so backslashes reach `re` unchanged under BOTH parsers).
+#   mismatch_detector.py      L31  `overall_mismatch_score: float`
+#                                  dataclass field in class MismatchReport
+#                                  (the attribute replay_test_runner reads)
+#   replay_test_runner.py     L82  `score = report.overall_mismatch_score`
+#                                  attribute read of a MismatchReport
+#   mainnet_test_runner.py    L186 `score = result["overall_mismatch_score"]`
+#                                  dict subscript — anchored to the
+#                                  subscript form, NOT a bare substring:
+#                                  L178 also emits the key in an error dict,
+#                                  so a bare substring would stay green if
+#                                  only the real read at L186 were renamed.
+#   ci_smoke_test.py          L79  `score = res["overall_mismatch_score"]`
+#                                  dict subscript (fail-loud read)
+#   helix_scan.py             L129 `score = result["overall_mismatch_score"]`
+#                                  dict subscript (the user-facing CLI)
+# The subscript form also rejects the soft-default drift
+# `[...].get("overall_mismatch_score", 0.0)` (the silent-0.0 class).
+  - 'mismatch_detector.py::(?m)^[^\x23\n]*\boverall_mismatch_score\s*:\s*float\b'
+  - 'replay_test_runner.py::(?m)^[^\x23\n]*\breport\.overall_mismatch_score\b'
+  - 'mainnet_test_runner.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
+  - 'ci_smoke_test.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
+  - 'helix_scan.py::(?m)^[^\x23\n]*\[\s*["\x27]overall_mismatch_score["\x27]\s*\]'
