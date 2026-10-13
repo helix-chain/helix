@@ -174,8 +174,8 @@ def _validate_result(result):
 
     Runs AFTER analyze_contract() and before the report / the JSON is printed,
     so `--json` prints nothing on stdout for a drifted result, and human mode
-    prints only the "Scanning:" progress line that precedes analysis (as every
-    runtime-error path does).
+    prints only the "Scanning:" progress line that precedes analysis (the
+    detector-exception path also starts with that line).
     """
     if "risk_level" not in result:
         print("[ERROR] Detector output contract drifted: missing key 'risk_level'.",

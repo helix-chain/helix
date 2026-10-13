@@ -183,8 +183,8 @@ class TestCliExitContract(unittest.TestCase):
     report / the JSON is printed, so a drifted result exits 2.  What lands on
     stdout is exactly pinned per mode: `--json` -> "" (empty); human mode ->
     only the progress line "Scanning: <path>" that helix_scan.py prints
-    before analyze_contract() runs (the same line every runtime-error path
-    leaves behind) - never a report header and never a score.
+    before analyze_contract() runs (the detector-exception path also starts
+    with it) - never a report header and never a score.
     """
 
     def setUp(self):
