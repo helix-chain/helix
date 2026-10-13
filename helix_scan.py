@@ -172,8 +172,10 @@ def _validate_result(result):
     through to a masking lookup with a soft "LOW" fallback and exit 0 = "safe to
     proceed".
 
-    Runs AFTER analyze_contract() and BEFORE any output, so a drifted result
-    prints nothing to stdout (no partial JSON for --json consumers).
+    Runs AFTER analyze_contract() and before the report / the JSON is printed,
+    so `--json` prints nothing on stdout for a drifted result, and human mode
+    prints only the "Scanning:" progress line that precedes analysis (as every
+    runtime-error path does).
     """
     if "risk_level" not in result:
         print("[ERROR] Detector output contract drifted: missing key 'risk_level'.",
@@ -211,7 +213,7 @@ def main():
         sys.exit(2)
     elapsed = time.time() - start
 
-    # Validate the detector output contract BEFORE any output is printed.
+    # Validate the detector output contract before the report / JSON is printed.
     _validate_result(result)
 
     # Output

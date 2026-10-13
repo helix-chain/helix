@@ -164,6 +164,13 @@ def _valid_result(risk_level="LOW", **overrides):
     return result
 
 
+def _drop_key(key, **kwargs):
+    """A well-formed output with one canonical key removed (drift case)."""
+    result = _valid_result(kwargs.pop("risk_level", "CRITICAL"), **kwargs)
+    del result[key]
+    return result
+
+
 class TestCliExitContract(unittest.TestCase):
     """The CLI must fail LOUD (exit 2) when the detector output contract drifts.
 
@@ -172,8 +179,12 @@ class TestCliExitContract(unittest.TestCase):
     proceed" even for a CRITICAL contract.  Any value outside
     LOW/MEDIUM/HIGH/CRITICAL also exited 0.  In human mode a missing key raised
     an uncaught KeyError -> exit 1, which means "HIGH/CRITICAL", not "error".
-    Validation must happen right after analyze_contract() returns and BEFORE any
-    output, so a drifted result exits 2 with nothing on stdout.
+    Validation must happen right after analyze_contract() returns and before the
+    report / the JSON is printed, so a drifted result exits 2.  What lands on
+    stdout is exactly pinned per mode: `--json` -> "" (empty); human mode ->
+    only the progress line "Scanning: <path>" that helix_scan.py prints
+    before analyze_contract() runs (the same line every runtime-error path
+    leaves behind) - never a report header and never a score.
     """
 
     def setUp(self):
@@ -201,33 +212,74 @@ class TestCliExitContract(unittest.TestCase):
                 code = e.code
         return code, out.getvalue(), err.getvalue()
 
-    # -- drift / invalid-value cases -------------------------------------
+    # -- drift cases: 3 drifts x 2 modes = 6 sub-tests --------------------
+    # Each drift is the same runtime-error class, so exit is 2 and stdout is
+    # exactly what helix_scan.py's own flow leaves there BEFORE validation:
+    #   * --json    -> "" (the JSON is only printed after validation)
+    #   * human     -> "  Scanning: <path>\n" and nothing derived from the
+    #     result (no report header, no score, no action line).
+    # The human expectation is built from the very temp .sol path handed to
+    # argv, so a hardcoded path can never satisfy it.
+    def test_drift_contract_per_mode(self):
+        """Both modes x all three drifts: exit 2, exact stdout, loud stderr."""
+        drifts = (
+            ("risk_level missing", _drop_key("risk_level"), True, "risk_level"),
+            ("risk_level UNKNOWN", _valid_result("UNKNOWN"), False, "risk_level"),
+            (
+                "overall_mismatch_score missing",
+                _drop_key("overall_mismatch_score", risk_level="CRITICAL"),
+                False,
+                "overall_mismatch_score",
+            ),
+        )
+        expected_human_out = "  Scanning: %s\n" % self._sol_path
+        for label, result, json_default, key in drifts:
+            for json_mode in (True, False):
+                with self.subTest(drift=label, json=json_mode):
+                    code, out, err = self._run_cli(result, json_mode=json_mode)
+                    tag = "%s / %s" % (label, "--json" if json_mode else "human")
+                    self.assertEqual(code, 2, tag)
+                    self.assertEqual(
+                        out, "" if json_mode else expected_human_out, tag
+                    )
+                    self.assertIn("[ERROR]", err, tag)
+                    self.assertIn(key, err, tag)
+
+    def test_drift_human_missing_risk_level_exits_2(self):
+        """Legacy name kept: human mode, missing risk_level -> exit 2, stdout
+        is only the Scanning progress line (never a report header)."""
+        result = _drop_key("risk_level")
+        code, out, err = self._run_cli(result, json_mode=False)
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "  Scanning: %s\n" % self._sol_path)
+        self.assertNotIn("HELIX Scan Result", out)
+        self.assertIn("[ERROR]", err)
+        self.assertIn("risk_level", err)
+
     def test_drift_json_missing_risk_level_exits_2(self):
-        result = _valid_result("CRITICAL")
-        del result["risk_level"]
-        code, out, err = self._run_cli(result, json_mode=True)
+        """Legacy name kept: --json, missing risk_level -> exit 2, stdout empty."""
+        code, out, err = self._run_cli(_drop_key("risk_level"), json_mode=True)
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
         self.assertIn("[ERROR]", err)
         self.assertIn("risk_level", err)
 
-    def test_drift_human_missing_risk_level_exits_2(self):
-        result = _valid_result("CRITICAL")
-        del result["risk_level"]
-        code, out, err = self._run_cli(result, json_mode=False)
-        self.assertEqual(code, 2)
-        self.assertNotIn("HELIX Scan Result", out)
-
     def test_invalid_value_json_exits_2(self):
+        """Legacy name kept: --json, unknown risk_level -> exit 2, stdout empty."""
         code, out, err = self._run_cli(_valid_result("UNKNOWN"), json_mode=True)
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
+        self.assertIn("[ERROR]", err)
+        self.assertIn("risk_level", err)
 
     def test_drift_json_missing_score_exits_2(self):
-        result = _valid_result("CRITICAL")
-        del result["overall_mismatch_score"]
+        """Legacy name kept: --json, missing score -> exit 2, stdout empty."""
+        result = _drop_key("overall_mismatch_score", risk_level="CRITICAL")
         code, out, err = self._run_cli(result, json_mode=True)
         self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("[ERROR]", err)
+        self.assertIn("overall_mismatch_score", err)
 
     # -- positive controls: a valid result keeps today's exit codes -------
     def test_positive_controls_json(self):
