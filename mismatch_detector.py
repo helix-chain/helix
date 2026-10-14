@@ -114,7 +114,285 @@ class CodeEncoder:
         ],
     }
 
-    def summarize(self, function_source: str) -> dict:
+    @staticmethod
+    def _mask_comments_and_strings(source: str) -> str:
+        """Blank Solidity comments and quoted strings while preserving offsets."""
+        chars = list(source)
+        state = None
+        i = 0
+        while i < len(chars):
+            ch = chars[i]
+            nxt = chars[i + 1] if i + 1 < len(chars) else ""
+            if state == "line":
+                if ch == "\n":
+                    state = None
+                elif ch not in "\r":
+                    chars[i] = " "
+            elif state == "block":
+                if ch == "*" and nxt == "/":
+                    chars[i] = chars[i + 1] = " "
+                    state = None
+                    i += 1
+                elif ch not in "\r\n":
+                    chars[i] = " "
+            elif state in ("'", '"'):
+                if ch == "\\":
+                    if ch not in "\r\n":
+                        chars[i] = " "
+                    if i + 1 < len(chars):
+                        if chars[i + 1] not in "\r\n":
+                            chars[i + 1] = " "
+                        i += 1
+                elif ch == state:
+                    chars[i] = " "
+                    state = None
+                elif ch not in "\r\n":
+                    chars[i] = " "
+            elif ch == "/" and nxt == "/":
+                chars[i] = chars[i + 1] = " "
+                state = "line"
+                i += 1
+            elif ch == "/" and nxt == "*":
+                chars[i] = chars[i + 1] = " "
+                state = "block"
+                i += 1
+            elif ch in ("'", '"'):
+                chars[i] = " "
+                state = ch
+            i += 1
+        return "".join(chars)
+
+    @staticmethod
+    def _matching_paren_end(expression: str, open_index: int) -> int:
+        depth = 0
+        for index in range(open_index, len(expression)):
+            if expression[index] == "(":
+                depth += 1
+            elif expression[index] == ")":
+                depth -= 1
+                if depth == 0:
+                    return index
+        return -1
+
+    @staticmethod
+    def _assignment_rhs(code: str, start: int) -> str:
+        parens = brackets = braces = 0
+        index = start
+        while index < len(code):
+            ch = code[index]
+            if ch == "(" :
+                parens += 1
+            elif ch == ")":
+                if parens == 0:
+                    break
+                parens -= 1
+            elif ch == "[":
+                brackets += 1
+            elif ch == "]":
+                if brackets == 0:
+                    break
+                brackets -= 1
+            elif ch == "{":
+                braces += 1
+            elif ch == "}":
+                if braces == 0:
+                    break
+                braces -= 1
+            elif ch in ";," and parens == brackets == braces == 0:
+                break
+            index += 1
+        return code[start:index].strip()
+
+    @classmethod
+    def _assignments_to(cls, code: str, variable: str) -> list:
+        """Return simple assignments to a bare variable, excluding tuple targets."""
+        import re
+        pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$]){re.escape(variable)}(?![A-Za-z0-9_$])"
+            rf"\s*(?P<operator>:=|=(?!=|>))"
+        )
+        assignments = []
+        for match in pattern.finditer(code):
+            before = code[:match.start()].rstrip()
+            if before.endswith((".", "]")):
+                continue
+            operator = match.group("operator")
+            rhs = cls._assignment_rhs(code, match.end())
+            assignments.append((match.start(), operator, rhs))
+        tuple_pattern = re.compile(r"\((?P<lhs>[^;{}()]*)\)\s*(?P<operator>:=|=(?!=|>))")
+        for match in tuple_pattern.finditer(code):
+            lhs = match.group("lhs")
+            if "," in lhs and re.search(
+                rf"(?<![A-Za-z0-9_$]){re.escape(variable)}(?![A-Za-z0-9_$])", lhs
+            ):
+                # Tuple writes invalidate earlier freshness, but never establish it.
+                assignments.append((match.start(), "tuple", ""))
+        assignments.sort(key=lambda item: item[0])
+        return assignments
+
+    @staticmethod
+    def _receiver_for_call(body: str, call_position: int) -> Optional[str]:
+        import re
+        identifier = r"[A-Za-z_]\w*"
+        receiver_pattern = re.compile(
+            rf"(?P<wrapped>(?:address|payable)\s*\(\s*(?P<wrapped_name>{identifier})\s*\)"
+            rf"|(?P<bare>{identifier}))\s*$",
+            re.IGNORECASE,
+        )
+        prefix = body[:call_position]
+        match = receiver_pattern.search(prefix)
+        if not match:
+            return None
+        before_receiver = prefix[:match.start()].rstrip()
+        if before_receiver.endswith((".", "]")):
+            return None
+        return match.group("wrapped_name") or match.group("bare")
+
+    @classmethod
+    def _is_creation_expression(
+        cls,
+        expression: str,
+        contract_source: Optional[str],
+        depth: int = 0,
+        assignment_operator: str = "=",
+        visited: tuple = (),
+    ) -> bool:
+        import re
+        expression = expression.strip()
+
+        # address(...) and payable(...) may wrap a direct new expression.
+        while True:
+            wrapper = re.match(r"^(?:address|payable)\s*\(", expression, re.IGNORECASE)
+            if not wrapper:
+                break
+            open_index = expression.find("(", wrapper.start())
+            close_index = cls._matching_paren_end(expression, open_index)
+            if close_index != len(expression) - 1:
+                break
+            expression = expression[open_index + 1:close_index].strip()
+
+        new_match = re.match(r"^new\s+[A-Za-z_]\w*\s*\(", expression)
+        if new_match:
+            open_index = expression.find("(", new_match.start())
+            return cls._matching_paren_end(expression, open_index) == len(expression) - 1
+
+        if assignment_operator == ":=":
+            create_match = re.match(r"^create2?\s*\(", expression)
+            if create_match:
+                open_index = expression.find("(", create_match.start())
+                if cls._matching_paren_end(expression, open_index) == len(expression) - 1:
+                    return True
+
+        helper_call = re.match(r"^([A-Za-z_]\w*)\s*\(", expression)
+        if (helper_call and contract_source is not None and depth < 2
+                and helper_call.group(1) not in {"create", "create2"}):
+            open_index = expression.find("(", helper_call.start())
+            if cls._matching_paren_end(expression, open_index) == len(expression) - 1:
+                return cls._helper_returns_creation(
+                    helper_call.group(1), contract_source, depth + 1, visited
+                )
+        return False
+
+    @classmethod
+    def _helper_returns_creation(
+        cls,
+        function_name: str,
+        contract_source: str,
+        depth: int,
+        visited: tuple,
+    ) -> bool:
+        import re
+        if depth > 2 or function_name in visited:
+            return False
+        clean_contract = cls._mask_comments_and_strings(contract_source)
+        # Reuse the detector's own brace-counting extractor on sanitized source.
+        extractor = object.__new__(IntentCodeMismatchDetector)
+        helper_source = extractor._extract_function_body(clean_contract, function_name)
+        if not helper_source:
+            return False
+        clean_helper = cls._mask_comments_and_strings(helper_source)
+        brace_index = clean_helper.find("{")
+        if brace_index < 0:
+            return False
+        header = clean_helper[:brace_index]
+        body = clean_helper[brace_index + 1:]
+        next_visited = visited + (function_name,)
+
+        return_statements = list(re.finditer(r"\breturn\s+([^;]+);", body, re.DOTALL))
+        for returned in return_statements:
+            expression = returned.group(1).strip()
+            if cls._is_creation_expression(
+                expression, contract_source, depth, visited=next_visited
+            ):
+                return True
+
+        returns_clause = re.search(r"\breturns\s*\(([^)]*)\)", header)
+        if not returns_clause:
+            return False
+        return_items = [item.strip() for item in returns_clause.group(1).split(",")]
+        if len(return_items) != 1:
+            return False
+        return_names = re.findall(r"[A-Za-z_]\w*", return_items[0])
+        if len(return_names) < 2:
+            return False
+        return_variable = return_names[-1]
+        assignments = cls._assignments_to(body, return_variable)
+
+        if return_statements:
+            for returned in return_statements:
+                if returned.group(1).strip() != return_variable:
+                    continue
+                prior = [item for item in assignments if item[0] < returned.start()]
+                if prior and cls._is_creation_expression(
+                    prior[-1][2], contract_source, depth,
+                    assignment_operator=prior[-1][1], visited=next_visited,
+                ):
+                    return True
+        elif assignments:
+            latest = assignments[-1]
+            return cls._is_creation_expression(
+                latest[2], contract_source, depth,
+                assignment_operator=latest[1], visited=next_visited,
+            )
+        return False
+
+    @classmethod
+    def _has_nonfresh_external_call(
+        cls,
+        function_source: str,
+        contract_source: Optional[str],
+    ) -> bool:
+        import re
+        clean_function = cls._mask_comments_and_strings(function_source)
+        brace_index = clean_function.find("{")
+        body = clean_function[brace_index + 1:] if brace_index >= 0 else clean_function
+        call_pattern = re.compile(
+            r"\.\s*(?:call|send|transfer)\b\s*(?:\{[^{}]*\}\s*)?\(",
+            re.IGNORECASE,
+        )
+        calls = list(call_pattern.finditer(body))
+        for call in calls:
+            receiver = cls._receiver_for_call(body, call.start())
+            if receiver is None:
+                return True
+            assignments = [
+                item for item in cls._assignments_to(body, receiver)
+                if item[0] < call.start()
+            ]
+            if not assignments:
+                return True
+            latest = assignments[-1]
+            if not cls._is_creation_expression(
+                latest[2], contract_source, assignment_operator=latest[1]
+            ):
+                return True
+        return False
+
+    def summarize(
+        self,
+        function_source: str,
+        contract_source: Optional[str] = None,
+    ) -> dict:
         """
         Returns pattern matches found in function body.
         Used as symbolic representation before embedding.
@@ -161,7 +439,15 @@ class CodeEncoder:
                         if not has_cei_violation or has_reentrancy_guard:
                             continue
                     elif pattern_name == 'missing_reentrancy_guard':
-                        if has_reentrancy_guard or not ext_positions:
+                        # A call can re-enter only through code the receiver runs. A target
+                        # created by this factory executes code chosen in this transaction;
+                        # an EIP-1167 clone runs its configured implementation. This is the
+                        # standard deploy-then-initialize idiom (EIP-1167; Solidity `new`,
+                        # CREATE and CREATE2 contract-creation semantics).
+                        if (has_reentrancy_guard or not ext_positions
+                                or not self._has_nonfresh_external_call(
+                                    function_source, contract_source
+                                )):
                             continue
                     elif pattern_name == 'missing_access_control':
                         if has_access_control:
@@ -341,7 +627,7 @@ class IntentCodeMismatchDetector:
         function_reports = []
         for func_name, intent_text in intent_map.items():
             func_source = self._extract_function_body(contract.source_code, func_name)
-            code_patterns = self.code_encoder.summarize(func_source)
+            code_patterns = self.code_encoder.summarize(func_source, contract.source_code)
             code_text = self._patterns_to_text(code_patterns)
 
             # Step 3: Embed both sides

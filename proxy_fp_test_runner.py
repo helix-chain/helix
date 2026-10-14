@@ -7,7 +7,7 @@ Description: FP test suite for Proxy/Diamond/CREATE2 patterns.
 
              GATE SEMANTICS (re-baselined 2026-07): the gate is a regression
              guard against the MEASURED baseline, not against an aspirational
-             zero. Two known threshold-edge FPs (see KNOWN_FP_BASELINE) are
+             zero. One known threshold-edge FP (see KNOWN_FP_BASELINE) is
              reported but non-gating; any NEW false positive, or any error,
              fails the suite. Rationale: the historical "6/6 PASS" was an
              artifact of the stale-key bug (every score read as 0.0 — see
@@ -55,15 +55,15 @@ def extract_score(result):
 
 
 # Known-FP baseline (re-baselined 2026-07). When PR #3 fixed the stale-key read
-# and real scores surfaced for the first time, two threshold-edge false
-# positives were revealed: CREATE2Factory 0.1007 and MinimalProxy 0.1985
-# against the 0.10 gate (identical locally and in CI run 28805089505).
-# Until the detector's safety-pattern layer is fixed (separate L3 task —
-# do NOT "fix" this by touching scoring or thresholds here):
+# and real scores surfaced for the first time, CREATE2Factory measured 0.1007
+# against the 0.10 gate. The MinimalProxy clone-factory false positive is
+# removed by the detector's fresh-deployment target check (M5); the scoring
+# formula and thresholds remain unchanged.
+# Until any remaining baseline FP is separately resolved:
 #   * a baselined file scoring >= FP_THRESHOLD  -> recorded as known_fp, non-gating
 #   * any OTHER file scoring >= FP_THRESHOLD    -> NEW false positive -> FAIL
 #   * a baselined file scoring < FP_THRESHOLD   -> hint to tighten this set
-KNOWN_FP_BASELINE = {"CREATE2Factory.sol", "MinimalProxy.sol"}
+KNOWN_FP_BASELINE = {"CREATE2Factory.sol"}
 
 # Test manifest: filename, pattern_type, description, why_risky_for_detector
 TEST_MANIFEST = [

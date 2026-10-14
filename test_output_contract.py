@@ -311,5 +311,370 @@ class TestCliExitContract(unittest.TestCase):
         )
 
 
+class TestFreshTargetReentrancy(unittest.TestCase):
+    """Freshly created targets do not create an untrusted reentrancy edge."""
+
+    # Literal evidence from E:/ai-work/agent-output/commander/runs/w2_04_m5_rca_ds_202610140939/probe/decomposition.json.
+    RCA_MISSING_GUARD_PAIRS = [('SIG-001', 'withdraw'),
+ ('SIG-021', 'withdraw'),
+ ('SIG-022', 'send'),
+ ('SIG-022', 'claimReward'),
+ ('SIG-023', 'flash'),
+ ('SIG-017', 'remove_liquidity'),
+ ('SIG-003', 'getReserves'),
+ ('SIG-003', 'borrow'),
+ ('SIG-004', 'getReserves'),
+ ('SIG-004', 'borrow'),
+ ('SIG-005', 'getReserves'),
+ ('SIG-005', 'borrow'),
+ ('SIG-006', 'getReserves'),
+ ('SIG-006', 'borrow'),
+ ('SIG-015', 'donateToReserves'),
+ ('SIG-024', 'emergencyWithdraw'),
+ ('SIG-025', 'transfer'),
+ ('SIG-013', 'getReserves'),
+ ('SIG-013', 'borrow'),
+ ('SIG-026', 'getReserves'),
+ ('SIG-026', 'borrow'),
+ ('SIG-027', 'getReserves'),
+ ('SIG-027', 'borrow'),
+ ('SIG-028', 'getReserves'),
+ ('SIG-028', 'borrow'),
+ ('SIG-002', 'transfer'),
+ ('SIG-007', 'transfer'),
+ ('SIG-016', 'transfer'),
+ ('SIG-020', 'performAction'),
+ ('SIG-029', 'performAction'),
+ ('SIG-030', 'transfer'),
+ ('SIG-031', 'performAction'),
+ ('SIG-008', 'transfer'),
+ ('SIG-010', 'transfer'),
+ ('SIG-018', 'transfer'),
+ ('SIG-032', 'transfer'),
+ ('SIG-033', 'transfer'),
+ ('SIG-036', 'sell'),
+ ('SIG-011', 'transfer'),
+ ('SIG-014', 'transfer'),
+ ('SIG-039', 'claimReward'),
+ ('SIG-019', 'claimReward'),
+ ('SIG-040', 'getReserves'),
+ ('SIG-040', 'borrow'),
+ ('SIG-009', 'execute'),
+ ('SIG-044', 'execute'),
+ ('SIG-045', 'execute'),
+ ('SIG-046', 'getReserves'),
+ ('SIG-046', 'borrow'),
+ ('SIG-047', 'withdraw'),
+ ('SIG-048', 'withdraw'),
+ ('SIG-049', 'withdraw'),
+ ('SIG-050', 'withdraw')]
+    RCA_OTHER_REPLAY_PATTERNS = [('SIG-001', 'deposit', {}),
+ ('SIG-021', 'getShareValue', {}),
+ ('SIG-017', 'deposit', {}),
+ ('SIG-003', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-004', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-005', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-006', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-015', 'deposit', {}),
+ ('SIG-024', 'deposit', {}),
+ ('SIG-025', 'init', {}),
+ ('SIG-013', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-026', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-027', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-028', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-002', 'initWallet', {}),
+ ('SIG-007', 'verifySignature', {}),
+ ('SIG-016', 'swapOut', {}),
+ ('SIG-030', 'deposit', {}),
+ ('SIG-008', 'withdrawERC20', {}),
+ ('SIG-010', 'confirmTx', {}),
+ ('SIG-012', 'transfer', {}),
+ ('SIG-018', 'withdraw', {}),
+ ('SIG-032', 'exportKey', {}),
+ ('SIG-033', 'sweepFunds', {}),
+ ('SIG-034', 'batchTransfer', {}),
+ ('SIG-035', 'batchTransfer', {}),
+ ('SIG-011', 'process', {}),
+ ('SIG-014', 'withdrawCustomer', {}),
+ ('SIG-037', 'claimDistribution', {}),
+ ('SIG-038', 'claimDistribution', {}),
+ ('SIG-040', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-041', 'transfer', {}),
+ ('SIG-041', 'emergencyWithdraw', {}),
+ ('SIG-042', 'transfer', {}),
+ ('SIG-042', 'emergencyWithdraw', {}),
+ ('SIG-043', 'transfer', {}),
+ ('SIG-043', 'emergencyWithdraw', {}),
+ ('SIG-046', 'getPrice', {'spot_price_oracle': True}),
+ ('SIG-047', 'processDeposit', {}),
+ ('SIG-048', 'processDeposit', {}),
+ ('SIG-049', 'processDeposit', {}),
+ ('SIG-050', 'processDeposit', {})]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.encoder = md.CodeEncoder()
+        cls.extractor = md.IntentCodeMismatchDetector()
+
+    def _summarize(self, function_source, contract_source=None):
+        # RED runs against the original one-argument API; candidate runs also exercise helper resolution.
+        import inspect
+        params = inspect.signature(self.encoder.summarize).parameters
+        if contract_source is not None and "contract_source" in params:
+            return self.encoder.summarize(function_source, contract_source=contract_source)
+        return self.encoder.summarize(function_source)
+
+    def _summarize_function(self, contract_source, function_name, helper_source=True):
+        function_source = self.extractor._extract_function_body(contract_source, function_name)
+        self.assertTrue(function_source, f"could not extract {function_name}")
+        return self._summarize(
+            function_source,
+            contract_source if helper_source else None,
+        )
+
+    def test_p1_minimal_proxy_deploy_then_initialize_is_fresh(self):
+        path = os.path.join(SCRIPT_DIR, "proxy_fp_tests", "MinimalProxy.sol")
+        with open(path, encoding="utf-8") as f:
+            contract_source = f.read()
+        function_source = self.extractor._extract_function_body(
+            contract_source, "createCloneWithInit"
+        )
+        self.assertTrue(function_source)
+        patterns = self._summarize(function_source, contract_source)
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_p2_new_expression_target_is_fresh(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function initialize(bytes memory data) external returns (bool) {
+                address c = address(new Child());
+                (bool ok,) = c.call(data);
+                return ok;
+            }
+        }
+        """
+        patterns = self._summarize_function(source, "initialize")
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_p3_inline_create2_target_is_fresh(self):
+        source = """
+        contract Factory {
+            function initialize(bytes memory data, bytes memory code, bytes32 salt)
+                external returns (bool)
+            {
+                address c;
+                assembly { c := create2(0, add(code, 32), mload(code), salt) }
+                (bool ok,) = c.call(data);
+                return ok;
+            }
+        }
+        """
+        patterns = self._summarize_function(source, "initialize")
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_p4_same_source_creation_helper_is_fresh(self):
+        source = """
+        contract Factory {
+            function run(address impl, bytes calldata data) external {
+                address c = _deployClone(impl);
+                (bool ok,) = c.call(data);
+                require(ok);
+            }
+            function _deployClone(address) internal returns (address clone) {
+                assembly { clone := create(0, 0, 0) }
+            }
+        }
+        """
+        patterns = self._summarize_function(source, "run")
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_p5_two_level_same_source_creation_helper_is_fresh(self):
+        source = """
+        contract Factory {
+            function run(address impl, bytes calldata data) external {
+                address c = _middle(impl);
+                (bool ok,) = c.call(data);
+                require(ok);
+            }
+            function _middle(address impl) internal returns (address clone) {
+                clone = _create(impl);
+            }
+            function _create(address) internal returns (address clone) {
+                assembly { clone := create2(0, 0, 0, 0) }
+            }
+        }
+        """
+        patterns = self._summarize_function(source, "run")
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_p6_address_and_payable_wrapped_targets_are_fresh(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function initialize(bytes memory data) external {
+                address c = address(new Child());
+                address(c).call(data);
+                payable(c).call(data);
+            }
+        }
+        """
+        patterns = self._summarize_function(source, "initialize")
+        self.assertNotIn("missing_reentrancy_guard", patterns)
+
+    def test_d1_parameter_target_is_not_fresh(self):
+        source = "contract C { function run(address target, bytes calldata data) external { target.call(data); } }"
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d2_reassignment_after_creation_is_not_fresh(self):
+        source = """
+        contract Factory {
+            function run(address impl, address target, bytes calldata data) external {
+                address c = _deployClone(impl);
+                c = target;
+                c.call(data);
+            }
+            function _deployClone(address) internal returns (address clone) {
+                assembly { clone := create(0, 0, 0) }
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d3_lookup_helper_is_not_creation(self):
+        source = """
+        contract Factory {
+            address stored;
+            function run(address impl, bytes calldata data) external {
+                address c = _lookup(impl);
+                c.call(data);
+            }
+            function _lookup(address) internal view returns (address) { return stored; }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d4_call_on_different_variable_is_not_fresh(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function run(address d, bytes calldata data) external {
+                address c = address(new Child());
+                d.call(data);
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d5_creation_in_comment_and_string_is_ignored(self):
+        source = """
+        contract C {
+            function run(bytes calldata data) external {
+                // address c = address(new Child());
+                string memory decoy = "address c = address(new Child());";
+                c.call(data);
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d6_every_call_is_checked(self):
+        source = """
+        contract Child {}
+        contract C {
+            function run(address target, bytes calldata data) external {
+                address c = address(new Child());
+                c.call(data);
+                target.call(data);
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d7_three_level_helper_chain_exceeds_resolution_limit(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function run(address impl, bytes calldata data) external {
+                address c = _f(impl);
+                c.call(data);
+            }
+            function _f(address impl) internal returns (address) { return _g(impl); }
+            function _g(address impl) internal returns (address) { return _h(impl); }
+            function _h(address) internal returns (address) { return address(new Child()); }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d8_helper_is_unresolved_without_contract_source(self):
+        source = """
+        contract Factory {
+            function run(address impl, bytes calldata data) external {
+                address c = _deployClone(impl);
+                c.call(data);
+            }
+            function _deployClone(address) internal returns (address clone) {
+                assembly { clone := create(0, 0, 0) }
+            }
+        }
+        """
+        self.assertIn(
+            "missing_reentrancy_guard",
+            self._summarize_function(source, "run", helper_source=False),
+        )
+
+    def test_d9_tuple_target_is_not_accepted_as_creation(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function run(bytes calldata data) external {
+                address c;
+                (, c) = (true, address(new Child()));
+                c.call(data);
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_d10_tuple_reassignment_cancels_freshness(self):
+        source = """
+        contract Child {}
+        contract Factory {
+            function run(address target, bytes calldata data) external {
+                address c = address(new Child());
+                (, c) = (true, target);
+                c.call(data);
+            }
+        }
+        """
+        self.assertIn("missing_reentrancy_guard", self._summarize_function(source, "run"))
+
+    def test_r1_all_replay_guard_dependencies_and_other_patterns_match_rca(self):
+        from attack_replay_contracts import REPLAY_CONTRACTS
+
+        self.assertEqual(53, len(self.RCA_MISSING_GUARD_PAIRS))
+        sources = {item["sig_id"]: item["source"] for item in REPLAY_CONTRACTS}
+        for sig_id, function_name in self.RCA_MISSING_GUARD_PAIRS:
+            source = sources[sig_id]
+            function_source = self.extractor._extract_function_body(source, function_name)
+            self.assertTrue(function_source, f"{sig_id}:{function_name} source missing")
+            patterns = self._summarize(function_source, source)
+            self.assertIn(
+                "missing_reentrancy_guard", patterns,
+                f"fix suppressed RCA replay dependency {sig_id}:{function_name}",
+            )
+
+        self.assertEqual(42, len(self.RCA_OTHER_REPLAY_PATTERNS))
+        for sig_id, function_name, expected_patterns in self.RCA_OTHER_REPLAY_PATTERNS:
+            source = sources[sig_id]
+            function_source = self.extractor._extract_function_body(source, function_name)
+            self.assertTrue(function_source, f"{sig_id}:{function_name} source missing")
+            actual_patterns = self._summarize(function_source, source)
+            self.assertEqual(
+                expected_patterns, actual_patterns,
+                f"unexpected pattern drift for {sig_id}:{function_name}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
