@@ -311,5 +311,216 @@ class TestCliExitContract(unittest.TestCase):
         )
 
 
+# ─────────────────────────────────────────────
+# Reentrancy-guard exemption regression (M5b)
+# ─────────────────────────────────────────────
+#
+# Source: E:/ai-work/agent-output/commander/runs/w2_04_m5_review_sol_202610141047/
+#         evidence_keep/attack_matrix.json  (name, source, old_flagged,
+#         new_suppressed)  x  .../evidence_keep/compilation_matrix.json
+#         (name, compiler_exit, valid — valid = compiles with solc 0.8.20)
+# Review run: w2_04_m5_review_sol_202610141047 (L3 review of PR
+#         helix-chain/helix#9, which proposed exempting
+#         `missing_reentrancy_guard` for calls to a contract created in the
+#         same function).  PR #9 was REJECTED: the review produced compiled
+#         Solidity counter-examples where the detector on `main` correctly
+#         reports `missing_reentrancy_guard` on the function `run` and the
+#         exempted detector does not.
+# Selection rule: every case in attack_matrix.json with
+#         old_flagged == True AND valid == True in compilation_matrix.json.
+#         The four old_flagged-but-invalid cases (unmatched_quote,
+#         unmatched_comment, receiver_this_direct, array_new_not_contract —
+#         solc errors) are excluded: they do not compile, so they cannot
+#         carry a compiled counter-example.  delegatecall_only and
+#         staticcall_only are excluded because old_flagged was already False.
+# Selected count: 22 from attack_matrix.json (15 of them new_suppressed ==
+#         True — the cases an exemption would hide) + fresh_reentrant_child
+#         (P1-9, kept in a separate review file) = 23.
+#
+# These cases are pinned against the CURRENT `main` detector (no exemption),
+# so any future re-introduction of the exemption turns this file RED.  The
+# assertion is made through the real call chain
+# `IntentCodeMismatchDetector.analyze()` (not `CodeEncoder.summarize`
+# directly): `analyze()` builds one `FunctionMismatch` per analyzed function
+# with `code_summary = self._patterns_to_text(code_patterns)`, and
+# `_patterns_to_text` maps `missing_reentrancy_guard` to the text
+# "no reentrancy protection modifier".  Binding to `analyze()` keeps the test
+# honest if the way `summarize` is called ever changes (extra parameters,
+# contract source, ...).
+REENTRANCY_BYPASS_CASES = (
+    # branch_not_taken (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'branch_not_taken',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = target; if (cond) { v = address(new Child()); } v.call(data);\n}\n\n}\n",
+    ),
+    # branch_latest_new (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'branch_latest_new',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v; if (cond) { v = target; } else { v = address(new Child()); } v.call(data);\n}\n\n}\n",
+    ),
+    # loop_zero (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'loop_zero',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = target; for (uint i=0; i<n; ++i) { v = address(new Child()); } v.call(data);\n}\n\n}\n",
+    ),
+    # assembly_sload (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'assembly_sload',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = address(new Child()); assembly { v := sload(0) } v.call(data);\n}\n\n}\n",
+    ),
+    # helper_different_return (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'helper_different_return',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = make(target); v.call(data);\n}\nfunction make(address target) internal returns (address) { address made = address(new Child()); return target; }\n}\n",
+    ),
+    # helper_early_target (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'helper_early_target',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = make(target,cond); v.call(data);\n}\nfunction make(address target,bool cond) internal returns (address) { if (cond) return target; return address(new Child()); }\n}\n",
+    ),
+    # helper_named_return_override (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'helper_named_return_override',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = make(target,cond); v.call(data);\n}\nfunction make(address target,bool cond) internal returns (address v) { v=address(new Child()); if(cond) return v; return target; }\n}\n",
+    ),
+    # helper_conditional_assignment (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'helper_conditional_assignment',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = make(target,cond); v.call(data);\n}\nfunction make(address target,bool cond) internal returns (address v) { v=target; if(cond) v=address(new Child()); }\n}\n",
+    ),
+    # helper_overload (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'helper_overload',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = make(target); v.call(data);\n}\nfunction make(uint n) internal returns (address) { return address(new Child()); }\nfunction make(address target) internal pure returns (address) { return target; }\n}\n",
+    ),
+    # shadowed_nested (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'shadowed_nested',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v=target; { address v=address(new Child()); } v.call(data);\n}\n\n}\n",
+    ),
+    # sibling_scope_name (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'sibling_scope_name',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\n{ address v=address(new Child()); } { address v; assembly { v := calldataload(4) } v.call(data); }\n}\n\n}\n",
+    ),
+    # conditional_expression (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'conditional_expression',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v = cond ? address(new Child()) : target; v.call(data);\n}\n\n}\n",
+    ),
+    # cr_only_comment (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'cr_only_comment',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\n// comment\r target.call(data);\n}\n\n}\n",
+    ),
+    # valid_escaped_string (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'valid_escaped_string',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\nstring memory s = \"quoted \\\" v=address(new Child());\"; target.call(data);\n}\n\n}\n",
+    ),
+    # receiver_this (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'receiver_this',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { address public v;\nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v=address(new Child()); this.v().call(data);\n}\n\n}\n",
+    ),
+    # receiver_struct (old_flagged=True, valid=True, new_suppressed=False)
+    (
+        'receiver_struct',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { struct Box { address v; } Box box;\nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v=address(new Child()); box.v.call(data);\n}\n\n}\n",
+    ),
+    # fresh_plus_delegatecall (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'fresh_plus_delegatecall',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v=address(new Child()); v.call(data); target.delegatecall(data);\n}\n\n}\n",
+    ),
+    # fresh_plus_staticcall (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'fresh_plus_staticcall',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { \nfunction run(address target, bool cond, uint n, bytes calldata data) external {\naddress v=address(new Child()); v.call(data); target.staticcall(data);\n}\n\n}\n",
+    ),
+    # state_mutated_by_helper (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'state_mutated_by_helper',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { address v;\nfunction run(address target, bool cond, uint n, bytes calldata data) external {\nv=address(new Child()); redirect(target); v.call(data);\n}\nfunction redirect(address target) internal { v=target; }\n}\n",
+    ),
+    # state_mutated_by_sstore (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'state_mutated_by_sstore',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Factory { address v;\nfunction run(address target, bool cond, uint n, bytes calldata data) external {\nv=address(new Child()); assembly { sstore(v.slot, target) } v.call(data);\n}\n\n}\n",
+    ),
+    # helper_unrelated_contract (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'helper_unrelated_contract',
+        "pragma solidity ^0.8.20;\ncontract Child {}\ncontract Decoy { function make(address) internal returns(address) { return address(new Child()); } }\ncontract Factory { function run(address target, bytes calldata data) external { address v=make(target); v.call(data); } function make(address target) internal pure returns(address) { return target; } }",
+    ),
+    # nested_call_options (old_flagged=True, valid=True, new_suppressed=True)
+    (
+        'nested_call_options',
+        "pragma solidity ^0.8.20;\ncontract Factory {\nstruct Info { uint amount; }\nfunction amount(Info memory info) internal pure returns(uint) { return info.amount; }\nfunction run(address target, bytes calldata data) external {\n    target.call{value: amount(Info({amount: 0}))}(data);\n}\n}\n",
+    ),
+    # fresh_reentrant_child (review P1-9, the decisive case: the receiver really
+    # IS created in this function, yet its receive() calls back into the
+    # caller). Tracked outside attack_matrix.json in the review run; source:
+    # w2_04_m5_review_sol_202610141047/evidence_keep/snippets/
+    # fresh_reentrant_child.sol (compiled with solc 0.8.20, valid).
+    (
+        'fresh_reentrant_child',
+        '// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\ninterface IRelay { function onPayout() external payable; }\ncontract Child {\n    address immutable relay;\n    constructor(address r) { relay=r; }\n    receive() external payable { IRelay(relay).onPayout{value:msg.value}(); }\n}\ncontract Factory {\n    uint public remaining = 1 ether;\n    receive() external payable {}\n    function run(address relay) external {\n        require(remaining > 0);\n        address v = address(new Child(relay));\n        (bool ok,) = v.call{value:remaining}("");\n        require(ok);\n        remaining = 0;\n    }\n}\ncontract Attacker is IRelay {\n    Factory immutable victim;\n    uint public callbacks;\n    constructor(Factory f) { victim=f; }\n    function attack() external { victim.run(address(this)); }\n    function onPayout() external payable { if (++callbacks < 2) victim.run(address(this)); }\n}\n',
+    ),)
+
+
+class TestReentrancyGuardNoExemption(unittest.TestCase):
+    """Permanent regression: no exemption may hide these reentrancy bypasses.
+
+    Each case is a compiled (solc 0.8.20) Solidity counter-example from the
+    rejected helix#9 review.  On `main` the detector MUST report
+    `missing_reentrancy_guard` for the function `run`; an exemption that
+    suppresses any of these cases turns CI red.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # Reuse the one existing stub (defined at module level) — no second
+        # CodeBERT replacement is added.
+        _stub_embedder()
+
+    def test_run_function_reports_missing_reentrancy_guard(self):
+        """Every selected case: `run`'s code_summary carries the guard finding."""
+        self.assertEqual(len(REENTRANCY_BYPASS_CASES), 23)
+
+        # The `cr_only_comment` case really contains a carriage return, and it
+        # is carried as an explicit "\r" escape so this file stays LF-only.
+        cr_case = dict(REENTRANCY_BYPASS_CASES)["cr_only_comment"]
+        self.assertIn("\r", cr_case)
+        self.assertNotIn("\n\r", cr_case)
+
+        for name, source in REENTRANCY_BYPASS_CASES:
+            with self.subTest(case=name):
+                detector = md.IntentCodeMismatchDetector()
+                report = detector.analyze(
+                    md.ContractInput(source_code=source, contract_address=None)
+                )
+                run_reports = [
+                    r for r in report.function_reports if r.function_name == "run"
+                ]
+                self.assertTrue(
+                    run_reports,
+                    "case %r: no FunctionMismatch named 'run' was produced — the "
+                    "analyze() call chain no longer reaches this function. "
+                    "Analysed functions: %r"
+                    % (name, [r.function_name for r in report.function_reports]),
+                )
+                code_summary = run_reports[0].code_summary
+                self.assertIn(
+                    "no reentrancy protection modifier",
+                    code_summary,
+                    "case %r: `run` is no longer flagged as missing a reentrancy "
+                    "guard — code_summary=%r. This case is a compiled "
+                    "counter-example from the rejected helix#9 exemption review; "
+                    "hiding it is the regression this test guards against."
+                    % (name, code_summary),
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
