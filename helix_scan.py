@@ -156,6 +156,48 @@ def print_human_report(result, elapsed):
         print()
 
 
+# Allowed values of the detector output field `risk_level` (the buckets of
+# mismatch_detector._score_to_risk); anything else is contract drift.
+VALID_RISK_LEVELS = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+
+
+def _validate_result(result):
+    """Fail LOUD (exit 2) if analyze_contract()'s output drifted.
+
+    Guards the consumer end of the 9ff61b7 field-drift class: the canonical
+    `risk_level` key must be present AND carry one of VALID_RISK_LEVELS, and
+    `overall_mismatch_score` must be present.  Anything else (a renamed key, a
+    missing key, an unknown value) is a contract drift, never a "LOW" default:
+    without this check a CRITICAL contract whose field went missing would fall
+    through to a masking lookup with a soft "LOW" fallback and exit 0 = "safe to
+    proceed".
+
+    Runs AFTER analyze_contract() and before the report / the JSON is printed,
+    so `--json` prints nothing on stdout for a drifted result, and human mode
+    prints only the "Scanning:" progress line that precedes analysis (the
+    detector-exception path also starts with that line).
+    """
+    if "risk_level" not in result:
+        print("[ERROR] Detector output contract drifted: missing key 'risk_level'.",
+              file=sys.stderr)
+        sys.exit(2)
+    if result["risk_level"] not in VALID_RISK_LEVELS:
+        print(
+            "[ERROR] Detector output contract drifted: invalid value for key "
+            f"'risk_level': {result['risk_level']!r} "
+            f"(allowed: {'/'.join(VALID_RISK_LEVELS)}).",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if "overall_mismatch_score" not in result:
+        print(
+            "[ERROR] Detector output contract drifted: missing key "
+            "'overall_mismatch_score'.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+
 def main():
     sol_path, address, json_mode = parse_args(sys.argv)
     source = validate_file(sol_path)
@@ -171,6 +213,9 @@ def main():
         sys.exit(2)
     elapsed = time.time() - start
 
+    # Validate the detector output contract before the report / JSON is printed.
+    _validate_result(result)
+
     # Output
     if json_mode:
         result["scan_file"] = sol_path
@@ -181,7 +226,7 @@ def main():
         print_human_report(result, elapsed)
 
     # Exit code
-    risk = result.get("risk_level", "LOW")
+    risk = result["risk_level"]
     if risk in ("HIGH", "CRITICAL"):
         sys.exit(1)
     sys.exit(0)
