@@ -126,7 +126,7 @@ Each **seed signature** is a portable metadata record — id, attack class, chai
 | **True Positive Rate** | **42/42 = 100%** of detectable historical exploits (50 replayed: 5 beyond MVP scope, 3 known limitations) — re-run 2026-07-10 |
 | **Mainnet blue-chips** | **4/4 clean** — WETH9, DAI, USDT, USDC all LOW (0.05–0.07), zero false positives — re-run 2026-07-10 |
 | **Clean/vulnerable smoke** | SafeToken → LOW (0.0512) · VulnerableVault → CRITICAL (0.5755) — verified in CI on every run |
-| **Proxy/Diamond/CREATE2 suite** | 4/6 clean; **2 known threshold-edge false positives** (CREATE2 factory 0.1007, EIP-1167 clone factory 0.1985 vs the 0.10 gate) — baselined as non-gating regression guards; detector-side fix tracked |
+| **Proxy/Diamond/CREATE2 suite** | 4/6 clean; 2 baselined threshold-edge findings (non-gating regression guards): **1 false positive** (CREATE2 factory 0.1007 vs the 0.10 gate) and **1 benign idiom the detector correctly flags** (EIP-1167 clone factory 0.1985 — it hands control to caller-supplied init data and is safe only because state is updated before the call, which a per-function pattern detector cannot see) |
 | **Historical 100 clean-ERC20 suite** | 0 FP reported 2026-04; that suite is currently offline pending restoration and is **excluded from present claims** |
 | **CI** | GitHub Actions regression guard (harness gate + output-contract test + smoke + proxy FP) |
 | **Known Limitations** | 3 cases: off-chain key leakage, Solidity <0.8 integer overflow, compiler-level bugs |
@@ -136,7 +136,7 @@ Each **seed signature** is a portable metadata record — id, attack class, chai
 > output field with a silent `0.0` default, so it could never fail — its
 > historical "6/6 PASS" was an artifact of the broken read, not a measurement.
 > The gate now reads the canonical score fail-loud (enforced by
-> `test_output_contract.py`), which surfaced the two known FPs above.
+> `test_output_contract.py`), which surfaced the two baselined findings above.
 > We publish the corrected numbers rather than the flattering ones.
 
 ---
@@ -164,7 +164,7 @@ L7  GENESIS ENGINE                 AI proposals → dual-chamber voting → stag
 | **Phase 3** | Month 12–18 | HELIX testnet with PoI consensus + HexScript |
 
 ### Phase 2 Entry Gates
-- [ ] False positive rate < 10% — re-validation in progress after the 2026-07 measurement fix (2 known threshold-edge FPs on the currently-runnable clean set; full clean-suite restoration pending)
+- [ ] False positive rate < 10% — re-validation in progress after the 2026-07 measurement fix (on the currently-runnable clean set: 1 threshold-edge false positive plus 1 correctly flagged benign idiom, both baselined; full clean-suite restoration pending)
 - [x] Verified immune signatures ≥ 500 → **500**
 - [ ] Design partner agreements ≥ 3
 
