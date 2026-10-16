@@ -522,5 +522,97 @@ class TestReentrancyGuardNoExemption(unittest.TestCase):
                 )
 
 
+class TestRustConsumerContract(unittest.TestCase):
+    """Keep the Rust wire schema aligned with the Python report producer."""
+
+    @classmethod
+    def setUpClass(cls):
+        _stub_embedder()
+
+    @staticmethod
+    def _required_rust_fields(source, struct_name):
+        match = re.search(
+            rf"(?m)^\s*pub\s+struct\s+{re.escape(struct_name)}\s*\{{"
+            rf"(?P<body>[\s\S]*?)^\s*\}}",
+            source,
+        )
+        if match is None:
+            raise AssertionError(f"Rust struct {struct_name} was not found")
+
+        required = []
+        pending_default = False
+        lines = match.group("body").splitlines()
+        index = 0
+        while index < len(lines):
+            line = lines[index].strip()
+            index += 1
+            if not line or line.startswith("//"):
+                continue
+            if line.startswith("#"):
+                attribute = [line]
+                while "]" not in attribute[-1] and index < len(lines):
+                    attribute.append(lines[index].strip())
+                    index += 1
+                pending_default = bool(
+                    re.search(
+                        r"#\s*\[\s*serde\s*\([\s\S]*?\bdefault\b",
+                        " ".join(attribute),
+                    )
+                )
+                continue
+
+            field = re.match(r"pub\s+([A-Za-z_]\w*)\s*:", line)
+            if field:
+                if not pending_default:
+                    required.append(field.group(1))
+                pending_default = False
+            else:
+                pending_default = False
+
+        if not required:
+            raise AssertionError(f"Rust struct {struct_name} has no parsed fields")
+        return required
+
+    def test_required_fields_and_risk_labels_match_python_producer(self):
+        rust_path = os.path.join(SCRIPT_DIR, "node", "src", "detector.rs")
+        with open(rust_path, encoding="utf-8") as rust_file:
+            rust_source = rust_file.read()
+
+        report_fields = self._required_rust_fields(rust_source, "DetectorReport")
+        finding_fields = self._required_rust_fields(rust_source, "FunctionFinding")
+
+        risk_method = re.search(
+            r"\bpub\s+fn\s+risk\s*\(\s*&\s*self\s*\)\s*"
+            r"->\s*Option\s*<\s*RiskLevel\s*>\s*\{"
+            r"(?P<body>[\s\S]*?)^\s*\}",
+            rust_source,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(risk_method, "Rust DetectorReport::risk() was not found")
+        rust_labels = set(
+            re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"\s*=>', risk_method.group("body"))
+        )
+        self.assertTrue(rust_labels, "no string-literal risk match arms were found")
+
+        result = md.analyze_contract(VULN_SOURCE)
+        for field in report_fields:
+            self.assertIn(field, result, f"Rust-required report field {field!r} is absent")
+
+        self.assertTrue(result["functions"], "producer returned no function findings")
+        for finding in result["functions"]:
+            for field in finding_fields:
+                self.assertIn(
+                    field,
+                    finding,
+                    f"Rust-required function field {field!r} is absent from {finding!r}",
+                )
+
+        producer = md.IntentCodeMismatchDetector()
+        producer_labels = {
+            producer._score_to_risk(score).upper() for score in (0.0, 0.10, 0.30, 0.45)
+        }
+        self.assertSetEqual({label.upper() for label in rust_labels}, producer_labels)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
