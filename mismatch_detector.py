@@ -280,6 +280,175 @@ class IntentExtractor:
 # 3. Code Encoder
 # ─────────────────────────────────────────────
 
+def _matching_parenthesis(source: str, opening: int):
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "(":
+            depth += 1
+        elif source[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _function_signature_parts(header: str):
+    import re
+
+    match = re.search(r"\bfunction\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(", header)
+    if not match:
+        return None
+    opening = header.find("(", match.start())
+    closing = _matching_parenthesis(header, opening)
+    if closing is None:
+        return None
+
+    parameters = header[opening + 1:closing]
+    parts = []
+    start = 0
+    depth = 0
+    for index, char in enumerate(parameters):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(parameters[start:index])
+            start = index + 1
+    if parameters[start:].strip():
+        parts.append(parameters[start:])
+    return header[closing + 1:], parts
+
+
+def _missing_access_control(function_source: str, header: str, body: str) -> bool:
+    import re
+
+    first = re.match(r"\s*([A-Za-z_$][A-Za-z0-9_$]*)", function_source)
+    if first and first.group(1) in ("receive", "fallback"):
+        return False
+    if first and first.group(1) == "function":
+        remainder = function_source[first.end():].lstrip()
+        if remainder.startswith("("):
+            return False
+
+    if re.search(r"\b(?:internal|private)\b", header):
+        return False
+
+    returns_match = re.search(r"\breturns\s*\(", header)
+    state_header = header
+    if returns_match:
+        opening = header.find("(", returns_match.start())
+        closing = _matching_parenthesis(header, opening)
+        if closing is None:
+            return False
+        state_header = header[:returns_match.start()] + header[closing + 1:]
+    if re.search(r"\b(?:view|pure|constant)\b", state_header):
+        return False
+
+    signature = _function_signature_parts(header)
+    if signature is None:
+        return False
+    suffix, parameter_parts = signature
+    excluded = {
+        "public", "external", "internal", "private", "view", "pure",
+        "constant", "payable", "virtual", "override", "returns", "nonpayable",
+    }
+    guard_terms = (
+        "only", "auth", "admin", "owner", "govern", "role", "initializ",
+        "restricted", "guard", "permission", "whitelist", "allow",
+    )
+    depth = 0
+    for token in re.finditer(r"[A-Za-z_$][A-Za-z0-9_$]*|[()]", suffix):
+        value = token.group()
+        if value == "(":
+            depth += 1
+        elif value == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0 and value.lower() not in excluded:
+            lowered = value.lower()
+            if any(term in lowered for term in guard_terms):
+                return False
+
+    if re.search(
+        r"\bmsg\s*\.\s*sender\b|\b_msgSender\s*\(\s*\)|\btx\s*\.\s*origin\b",
+        body,
+    ):
+        return False
+    if re.search(
+        r"\becrecover\s*\(|\.\s*recover\s*\(|"
+        r"\bisValidSignature[A-Za-z0-9_$]*\s*\(|\bverify[A-Za-z0-9_$]*\s*\(",
+        body,
+    ):
+        return False
+    if re.search(r"\brequire\s*\(\s*![^)]*\binitiali[sz]ed\b", body):
+        return False
+    if re.search(r"\bif\s*\([^)]*\binitiali[sz]ed\b", body):
+        return False
+
+    parameter_names = set()
+    address_parameters = set()
+    type_qualifiers = {
+        "address", "uint", "int", "bool", "bytes", "string", "payable",
+        "memory", "storage", "calldata", "external", "internal", "indexed",
+    }
+    for part in parameter_parts:
+        identifiers = list(re.finditer(r"[A-Za-z_$][A-Za-z0-9_$]*", part))
+        if len(identifiers) < 2:
+            continue
+        name_match = identifiers[-1]
+        name = name_match.group()
+        lowered_name = name.lower()
+        if (lowered_name in type_qualifiers
+                or re.fullmatch(r"(?:u?int|bytes)[0-9]*", lowered_name)):
+            continue
+        parameter_names.add(name)
+        if re.search(r"\baddress\b", part[:name_match.start()], re.IGNORECASE):
+            address_parameters.add(name)
+
+    local_declaration = re.compile(
+        r"\b(?:address|uint[0-9]*|int[0-9]*|bool|bytes[0-9]*|string)\b"
+        r"(?:\s+(?:payable|memory|storage|calldata)\b)*\s+"
+        r"([A-Za-z_$][A-Za-z0-9_$]*)\b"
+    )
+    local_names = {match.group(1) for match in local_declaration.finditer(body)}
+    privileged_prefixes = (
+        "owner", "admin", "governance", "governor", "guardian", "operator",
+        "authority", "controller", "implementation", "minter", "pendingowner",
+        "pendingadmin", "signer", "keeper", "treasury", "mastermint", "pauser",
+        "blacklister", "rescuer",
+    )
+    assignment = re.compile(r"(?<![A-Za-z0-9_$.])([A-Za-z_$][A-Za-z0-9_$]*)\s*=(?!=)")
+    for match in assignment.finditer(body):
+        name = match.group(1)
+        if name in local_names:
+            continue
+        if re.search(r"\.\s*$", body[:match.start()]):
+            continue
+        normalized = name[1:] if name.startswith("_") else name
+        if normalized.lower().startswith(privileged_prefixes):
+            return True
+
+    if re.search(r"\b(?:selfdestruct|suicide)\s*\(", body):
+        return True
+    if re.search(r"\.\s*delegatecall\s*\(", body):
+        return True
+
+    low_level_call = re.compile(
+        r"\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*call\s*"
+        r"(?:\{[^}]*\}\s*)?\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\b"
+    )
+    for match in low_level_call.finditer(body):
+        if match.group(1) in parameter_names and match.group(2) in parameter_names:
+            return True
+
+    mapping_write = re.compile(
+        r"\b[A-Za-z_$][A-Za-z0-9_$]*\s*\[\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\]\s*(?:\+=|=(?!=))"
+    )
+    if any(match.group(1) in address_parameters for match in mapping_write.finditer(body)):
+        return True
+    return False
+
+
 class CodeEncoder:
     """
     Encodes Solidity function bodies to semantic vectors.
@@ -301,9 +470,7 @@ class CodeEncoder:
             r"unchecked\s*\{",
             r"\+=.*\d+",  # simplified
         ],
-        "missing_access_control": [
-            r"function\s+\w+\s*\([^)]*\)\s*(?:external|public)\s*(?!.*onlyOwner)",
-        ],
+        "missing_access_control": [],
         "spot_price_oracle": [
             r"\.getReserves\(",
             r"price0CumulativeLast",
@@ -322,6 +489,7 @@ class CodeEncoder:
 
         # Split: full function (for safety checks) vs body (for risk patterns)
         brace_idx = function_source.find('{')
+        header = function_source[:brace_idx] if brace_idx >= 0 else function_source
         body_only = function_source[brace_idx+1:] if brace_idx >= 0 else function_source
 
         # --- Safety checks on FULL function (includes modifiers in signature) ---
@@ -346,13 +514,12 @@ class CodeEncoder:
                 r'\b\w+\s*\[[^\]]*\]\s*[-+]?=\s*(?!=)', post_call
             ))
 
-        has_access_control = bool(re.search(
-            r'onlyOwner|onlyAdmin|require\s*\(\s*msg\.sender\s*==\s*\w+|require\s*\(\s*isOwner',
-            function_source, re.IGNORECASE
-        ))
-
         # --- Risk patterns on BODY ONLY (not function signature!) ---
         for pattern_name, regexes in self.RISK_PATTERNS.items():
+            if pattern_name == "missing_access_control":
+                if _missing_access_control(function_source, header, body_only):
+                    found_patterns[pattern_name] = True
+                continue
             for regex in regexes:
                 if re.search(regex, body_only, re.IGNORECASE):
                     if pattern_name == 'external_call_before_state_update':
@@ -360,9 +527,6 @@ class CodeEncoder:
                             continue
                     elif pattern_name == 'missing_reentrancy_guard':
                         if has_reentrancy_guard or not ext_positions:
-                            continue
-                    elif pattern_name == 'missing_access_control':
-                        if has_access_control:
                             continue
                     found_patterns[pattern_name] = True
                     break

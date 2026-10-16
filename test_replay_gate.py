@@ -471,18 +471,13 @@ class ReplayGateTests(unittest.TestCase):
     def test_real_pattern_gap_baseline_matches_real_detectable_contracts(self):
         if not hasattr(gate, "PATTERN_GAP_BASELINE"):
             self.skipTest("the original runner has no measured pattern-gap baseline")
-        expected_baseline = {
-            "SIG-002", "SIG-007", "SIG-008", "SIG-010", "SIG-011",
-            "SIG-014", "SIG-016", "SIG-018", "SIG-020", "SIG-025",
-            "SIG-029", "SIG-030", "SIG-031", "SIG-032", "SIG-033",
-            "SIG-036", "SIG-047", "SIG-048", "SIG-049", "SIG-050",
-        }
+        expected_baseline = {"SIG-036"}
         contract_ids = {item["sig_id"] for item in REPLAY_CONTRACTS}
         detectable_ids = contract_ids - set(gate.BEYOND_MVP) - set(gate.KNOWN_UNDETECTABLE)
         contracts_by_id = {item["sig_id"]: item for item in REPLAY_CONTRACTS}
 
         self.assertEqual(gate.PATTERN_GAP_BASELINE, expected_baseline)
-        self.assertEqual(len(gate.PATTERN_GAP_BASELINE), 20)
+        self.assertEqual(len(gate.PATTERN_GAP_BASELINE), 1)
         self.assertTrue(gate.PATTERN_GAP_BASELINE <= detectable_ids)
         self.assertTrue(all(contracts_by_id[sig_id]["expected_patterns"] for sig_id in gate.PATTERN_GAP_BASELINE))
         for sig_id in sorted(detectable_ids):

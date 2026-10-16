@@ -266,5 +266,89 @@ class SpecialFunctionTests(unittest.TestCase):
         self.assertIn("nothing was scanned", proc.stderr.lower())
 
 
+class MissingAccessControlTests(unittest.TestCase):
+    def setUp(self):
+        self.encoder=mismatch_detector.CodeEncoder()
+
+    def _has_missing_access(self, source):
+        return "missing_access_control" in self.encoder.summarize(source)
+
+    def test_unprotected_privileged_effects_are_reported(self):
+        sources=(
+            "function setOwner(address nextOwner) external { owner = nextOwner; }",
+            "function execute(address target, bytes calldata data) external { target.call(data); }",
+            "function credit(address account, uint256 amount) external { balances[account] += amount; }",
+            "function destroy() external { selfdestruct(payable(address(0))); }",
+            "function forward(address target, bytes calldata data) external { target.delegatecall(data); }",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertTrue(self._has_missing_access(source))
+
+    def test_access_modifiers_and_caller_checks_suppress_the_pattern(self):
+        sources=(
+            "function setOwner(address nextOwner) external onlyOwner { owner = nextOwner; }",
+            "function setOwner(address nextOwner) external onlyRole(ADMIN) { owner = nextOwner; }",
+            "function setOwner(address nextOwner) external auth { owner = nextOwner; }",
+            "function setOwner(address nextOwner) external ifAdmin { owner = nextOwner; }",
+            "function setOwner(address nextOwner) external initializer { owner = nextOwner; }",
+            "function setOwner(address nextOwner) external { require(msg.sender == owner); owner = nextOwner; }",
+            "function setOwner(address nextOwner) external { if (msg.sender != owner) revert(); owner = nextOwner; }",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertFalse(self._has_missing_access(source))
+
+    def test_signatures_one_time_guards_visibility_and_mutability_suppress(self):
+        sources=(
+            "function setOwner(address nextOwner) external { owner = ecrecover(hash, v, r, s); }",
+            "function setOwner(address nextOwner) external { require(!initialized); owner = nextOwner; initialized = true; }",
+            "function setOwner(address nextOwner) external { if (initialized) revert(); owner = nextOwner; }",
+            "function readOwner() external view returns (address) { return owner; }",
+            "function readOwner() external pure returns (uint256) { return 1; }",
+            "function setOwner(address nextOwner) internal { owner = nextOwner; }",
+            "function setOwner(address nextOwner) private { owner = nextOwner; }",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertFalse(self._has_missing_access(source))
+
+    def test_local_members_deposits_and_token_operations_are_not_privileged_effects(self):
+        sources=(
+            "function localOwner(address account) external { address owner = account; owner = address(0); }",
+            "function setMember(Box storage x, address nextOwner) external { x.owner = nextOwner; }",
+            "function create(bytes memory initData) external { address clone = _clone(); clone.call(initData); }",
+            "function deposit() external payable { balances[msg.sender] += msg.value; }",
+            "function transfer(address to, uint256 amount) public returns (bool) { _transfer(msg.sender, to, amount); return true; }",
+            "function transferFrom(address from, address to, uint256 amount) public returns (bool) { _transfer(from, to, amount); return true; }",
+            "function approve(address spender, uint256 amount) public returns (bool) { _approve(msg.sender, spender, amount); return true; }",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertFalse(self._has_missing_access(source))
+
+    def test_fallback_and_receive_delegatecalls_are_excluded(self):
+        sources=(
+            "fallback() external { proxy.delegatecall(msg.data); }",
+            "receive() external payable { proxy.delegatecall(msg.data); }",
+            "function () external payable { proxy.delegatecall(msg.data); }",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertFalse(self._has_missing_access(source))
+
+    def test_risk_pattern_keys_keep_the_required_order(self):
+        self.assertEqual(
+            list(self.encoder.RISK_PATTERNS),
+            [
+                "external_call_before_state_update",
+                "missing_reentrancy_guard",
+                "unchecked_arithmetic",
+                "missing_access_control",
+                "spot_price_oracle",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

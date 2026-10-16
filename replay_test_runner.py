@@ -30,14 +30,9 @@ KNOWN_UNDETECTABLE = {
 # Signatures outside MVP scope (rug_pull and pure logic_error).
 BEYOND_MVP = {"SIG-037", "SIG-038", "SIG-041", "SIG-042", "SIG-043"}
 
-# Measured with the real model, torch 2.12.1+cpu, 2026-10. These 20
-# detectable signatures were flagged but their expected pattern was not found.
-PATTERN_GAP_BASELINE = {
-    "SIG-002", "SIG-007", "SIG-008", "SIG-010", "SIG-011",
-    "SIG-014", "SIG-016", "SIG-018", "SIG-020", "SIG-025",
-    "SIG-029", "SIG-030", "SIG-031", "SIG-032", "SIG-033",
-    "SIG-036", "SIG-047", "SIG-048", "SIG-049", "SIG-050",
-}
+# Measured with the real model, torch 2.12.1+cpu, 2026-10. One detectable
+# signature was flagged but its expected pattern was not found.
+PATTERN_GAP_BASELINE = {"SIG-036"}
 
 
 def _known_map(values):
