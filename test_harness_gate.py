@@ -88,15 +88,25 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def _retry_readonly_removal(function, path, exc_info):
+    """rmtree error handler: clear the read-only bit and retry the removal.
+
+    rmtree also reports a file that vanished before it could be unlinked (for
+    example a lock file that git's background maintenance removed first). That
+    path is already gone, which is the goal, so it is not an error.
+    """
+    reported = exc_info[1] if isinstance(exc_info, tuple) else exc_info
+    if isinstance(reported, FileNotFoundError):
+        return
     try:
         os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
         function(path)
-    except OSError:
-        raise
+    except FileNotFoundError:
+        return
 
 
 def _remove_tree(path):
@@ -256,6 +266,16 @@ def _git(repo, *args):
         check=True, capture_output=True, text=True,
         encoding="utf-8", errors="replace",
     )
+    if args and args[0] == "init":
+        # A commit can start git's detached background maintenance, which writes
+        # and removes files under .git/objects while the test tears the repo
+        # down. Fixture repos never need it.
+        for key, value in (("maintenance.auto", "false"), ("gc.auto", "0")):
+            subprocess.run(
+                ["git", "-C", repo, "config", key, value],
+                check=True, capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
+            )
 
 
 def _run_gate(repo, cmd, extra_env=None, rules=None):
@@ -1414,6 +1434,93 @@ class FailClosedHarnessProbe(unittest.TestCase):
         _git(repo, "commit", "-qm", "create cleanup fixture")
         _remove_tree(repo)
         self.assertFalse(os.path.exists(repo), "the committed repository tree must be removed")
+
+
+class CleanupHelperRaceTests(unittest.TestCase):
+    """The cleanup helper must tolerate a path that another process removed first.
+
+    shutil.rmtree reports every OSError to its handler, including the
+    FileNotFoundError for a file that vanished between listing and unlinking.
+    Git's background maintenance does exactly that to .git/objects/maintenance.lock,
+    so a path that is already gone counts as removed.
+    """
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="helix_cleanup_race_")
+        self.addCleanup(shutil.rmtree, self.root, True)
+
+    def _missing(self):
+        return os.path.join(self.root, "already_removed.lock")
+
+    def _make_file(self, *parts):
+        path = os.path.join(self.root, *parts)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("x")
+        return path
+
+    def test_handler_treats_a_vanished_path_as_removed(self):
+        def must_not_retry(path):
+            raise AssertionError("a vanished path must not be retried")
+
+        gone = FileNotFoundError(2, "No such file or directory", self._missing())
+        for label, reported in (
+            ("exc_info tuple", (FileNotFoundError, gone, None)),
+            ("exception instance", gone),
+        ):
+            with self.subTest(label):
+                self.assertIsNone(
+                    _retry_readonly_removal(must_not_retry, self._missing(), reported)
+                )
+
+    def test_handler_treats_a_path_removed_after_chmod_as_removed(self):
+        target = self._make_file("vanishes_during_retry.lock")
+
+        def removed_by_someone_else(path):
+            raise FileNotFoundError(2, "No such file or directory", path)
+
+        denied = PermissionError(13, "Permission denied", target)
+        self.assertIsNone(_retry_readonly_removal(removed_by_someone_else, target, denied))
+
+    def test_handler_still_raises_errors_other_than_a_vanished_path(self):
+        target = self._make_file("stays_locked.lock")
+
+        def still_denied(path):
+            raise PermissionError(13, "Permission denied", path)
+
+        denied = PermissionError(13, "Permission denied", target)
+        with self.assertRaises(PermissionError):
+            _retry_readonly_removal(still_denied, target, denied)
+
+    def test_remove_tree_survives_a_file_deleted_by_another_process(self):
+        # Reproduces the failure on interpreters whose rmtree reports a vanished
+        # file to the handler; where rmtree ignores it by itself this passes
+        # without exercising the handler (the tests above cover the handler).
+        self._make_file("tree", "objects", "maintenance.lock")
+        self._make_file("tree", "objects", "pack.idx")
+        tree = os.path.join(self.root, "tree")
+
+        real_unlink = os.unlink
+
+        def unlink_after_another_process_won(path, *args, **kwargs):
+            real_unlink(path, *args, **kwargs)
+            if os.path.basename(os.fspath(path)) == "maintenance.lock":
+                raise FileNotFoundError(2, "No such file or directory", os.fspath(path))
+
+        with unittest.mock.patch("os.unlink", unlink_after_another_process_won):
+            _remove_tree(tree)
+        self.assertFalse(os.path.exists(tree), "the tree must be removed despite the race")
+
+    def test_fixture_repos_disable_background_maintenance(self):
+        repo = tempfile.mkdtemp(prefix="helix_cleanup_cfg_")
+        self.addCleanup(_remove_tree, repo)
+        _git(repo, "init", "-q")
+        for key, expected in (("maintenance.auto", "false"), ("gc.auto", "0")):
+            got = subprocess.run(
+                ["git", "-C", repo, "config", "--local", "--get", key],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+            ).stdout.strip()
+            self.assertEqual(got, expected, f"{key} must be {expected} in fixture repos")
 
 
 if __name__ == "__main__":
