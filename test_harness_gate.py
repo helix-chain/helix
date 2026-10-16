@@ -1,6 +1,6 @@
 """
 test_harness_gate.py
-Version: V1.3
+Version: V1.5
 
 Probe self-test for the deterministic harness gate (.ci/harness_check.py +
 .ci/harness_rules.yaml). Proves the gate actually BITES: dangerous staged
@@ -64,17 +64,49 @@ D)  Every bait loop runs each iteration in a subTest, so the first failing bait
     no longer hides the ones after it.
 
 Run:  python test_harness_gate.py
+
+V1.4 additions (F1/F2 fail-closed hardening)
+--------------------------------------------
+Adds regression probes for path-scoped checker/rules exemptions, README and
+same-basename decoys (including built-in secret fallbacks), tracked-file read
+errors, Git command errors and return-code semantics, explicit rules-file
+failures, the portable missing-default-rules skip, and a real-tree positive
+control. Secret-shaped test data is assembled at runtime.
+
+V1.5 additions (path handling and cleanup)
+-------------------------------------------
+Adds coverage for NUL-delimited Git path lists, literal pathspecs, Unicode
+names, invalid UTF-8 paths, default rules directories, and read-only Git-tree
+cleanup.
 """
 
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _retry_readonly_removal(function, path, exc_info):
+    try:
+        os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        function(path)
+    except OSError:
+        raise
+
+
+def _remove_tree(path):
+    if os.path.lexists(path):
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(path, onexc=_retry_readonly_removal)
+        else:
+            shutil.rmtree(path, onerror=_retry_readonly_removal)
+
+
 HARNESS = os.path.join(SCRIPT_DIR, ".ci", "harness_check.py")
 RULES = os.path.join(SCRIPT_DIR, ".ci", "harness_rules.yaml")
 
@@ -194,8 +226,31 @@ BAITS = [
 NOYAML_SHIM_BODY = 'raise ImportError("forced no-yaml for probe")\n'
 
 
+_PENDING_TEST_ADDS = {}
+
+
+def _flush_test_adds(repo):
+    key = os.path.normcase(os.path.abspath(repo))
+    paths = _PENDING_TEST_ADDS.pop(key, [])
+    if paths:
+        subprocess.run(
+            ["git", "-C", repo, "add", "--", *paths],
+            check=True, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
+        )
+
+
 def _git(repo, *args):
-    """Run a git command in repo, raising on failure (never uses `git add -A`)."""
+    """Run a git command in repo; batch explicit single-path adds until a gate."""
+    if args and args[0] == "add" and "-f" not in args and "--force" not in args:
+        paths = list(args[args.index("--") + 1:]) if "--" in args else [
+            arg for arg in args[1:] if arg not in ("-f", "--force")
+        ]
+        if len(paths) == 1 and paths[0] not in (".", "-A", "--all"):
+            key = os.path.normcase(os.path.abspath(repo))
+            _PENDING_TEST_ADDS.setdefault(key, []).extend(paths)
+            return
+    _flush_test_adds(repo)
     subprocess.run(
         ["git", "-C", repo, *args],
         check=True, capture_output=True, text=True,
@@ -204,7 +259,9 @@ def _git(repo, *args):
 
 
 def _run_gate(repo, cmd, extra_env=None, rules=None):
-    """Invoke the SHIPPED harness checker via its real CLI. Returns (rc, output).
+    """Invoke the SHIPPED checker module through its CLI parser in-process.
+    Returns (rc, output); preserving the same argv/output contract avoids
+    repeated interpreter startup in the exhaustive real-tree bait loops.
 
     Encoding is pinned (utf-8/replace) so the checker's CJK [PASS]/[FAIL] lines
     can never raise a UnicodeEncodeError in capture and mask the real exit code.
@@ -213,12 +270,41 @@ def _run_gate(repo, cmd, extra_env=None, rules=None):
     (used by the P1-2 negative control), which is why this is an optional
     parameter rather than a second near-identical helper.
     """
-    proc = subprocess.run(
-        [sys.executable, HARNESS, cmd, "--rules", rules or RULES, "--repo", repo],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        env=extra_env,
-    )
-    return proc.returncode, (proc.stdout + proc.stderr)
+    _flush_test_adds(repo)
+    from contextlib import nullcontext, redirect_stderr, redirect_stdout
+    from io import StringIO
+    from unittest.mock import patch
+
+    module = getattr(_run_gate, "_module", None)
+    if module is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("harness_gate_cli", HARNESS)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _run_gate._module = module
+
+    old_argv, old_path = sys.argv[:], sys.path[:]
+    previous_yaml = sys.modules.pop("yaml", None)
+    env = extra_env if extra_env is not None else os.environ
+    pythonpath = env.get("PYTHONPATH", "")
+    if pythonpath:
+        sys.path[:0] = [p for p in pythonpath.split(os.pathsep) if p]
+    sys.argv = [HARNESS, cmd, "--rules", rules or RULES, "--repo", repo]
+    output, errors = StringIO(), StringIO()
+    env_patch = patch.dict(os.environ, extra_env, clear=True) if extra_env is not None else nullcontext()
+    try:
+        with env_patch, redirect_stdout(output), redirect_stderr(errors):
+            try:
+                rc = module.main()
+            except SystemExit as exc:
+                rc = exc.code or 0
+    finally:
+        sys.argv, sys.path = old_argv, old_path
+        sys.modules.pop("yaml", None)
+        if previous_yaml is not None:
+            sys.modules["yaml"] = previous_yaml
+    return rc, output.getvalue() + errors.getvalue()
 
 
 def _noyaml_env():
@@ -388,7 +474,7 @@ class HarnessGateProbe(unittest.TestCase):
 
     def tearDown(self):
         # shutil.rmtree is a Python call, not a shell recursive delete.
-        shutil.rmtree(self.repo, ignore_errors=True)
+        _remove_tree(self.repo)
 
     def _write(self, rel, content):
         path = os.path.join(self.repo, rel)
@@ -478,7 +564,7 @@ class HarnessGateProbe(unittest.TestCase):
         try:
             rc, out = self._run_drift_fixture(extra_env=env)
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("overall_mismatch_score", out)
         self.assertIn("required 未满足: mismatch_detector.py", out)
@@ -560,7 +646,7 @@ class HarnessGateProbe(unittest.TestCase):
             )
             self.assertIn("[PASS]", out)
         finally:
-            shutil.rmtree(os.path.dirname(no_emit), ignore_errors=True)
+            _remove_tree(os.path.dirname(no_emit))
 
     # --- service_role secret rule, under BOTH parser paths ----------------
 
@@ -644,7 +730,7 @@ class HarnessGateProbe(unittest.TestCase):
         try:
             rc, out = _run_gate(self.repo, "grep", extra_env=env)
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("service_role", out)
 
@@ -698,7 +784,7 @@ class RealTreeAnchorProbe(unittest.TestCase):
             _git(self.repo, "add", "--", rel)
 
     def tearDown(self):
-        shutil.rmtree(self.repo, ignore_errors=True)
+        _remove_tree(self.repo)
 
     def _path(self, rel):
         return os.path.join(self.repo, rel)
@@ -746,7 +832,7 @@ class RealTreeAnchorProbe(unittest.TestCase):
         try:
             yield "minimal", env
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
 
     def test_a_positive_control_real_files_pass_both_parsers(self):
         """(a) The unmodified REAL consumer files must satisfy every anchor."""
@@ -819,6 +905,515 @@ class RealTreeAnchorProbe(unittest.TestCase):
                 rc, out = _run_gate(self.repo, "grep", extra_env=env)
                 self.assertEqual(rc, 1, f"[{label} parser] commented read stayed green; out=\n{out}")
                 self.assertEqual(_missing_required(out), {expected})
+
+
+class FailClosedHarnessProbe(unittest.TestCase):
+    """F1/F2 regression probes; every fixture lives under one temp root that
+    tearDownClass removes (same convention as the other probe classes)."""
+
+    MARKER = "HELIX_" + "HARNESS_SCAN_MARKER"
+    _modules = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        # shutil.rmtree is a Python call on our own mkdtemp() root, not a shell delete.
+        _remove_tree(cls.probe)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.probe = tempfile.mkdtemp(prefix="helix_failclosed_root_")
+        cls.repo = tempfile.mkdtemp(prefix="helix_failclosed_", dir=cls.probe)
+        cls.control_dir = os.path.join(cls.repo, ".ci")
+        cls.decoy_dir = os.path.join(cls.repo, "sub")
+        os.makedirs(cls.control_dir)
+        os.makedirs(cls.decoy_dir)
+        cls.checker = os.path.join(cls.control_dir, "harness_check.py")
+        cls.rules = os.path.join(cls.control_dir, "harness_rules.yaml")
+        shutil.copyfile(HARNESS, cls.checker)
+        # The actual checker file carries the forbidden marker, proving that
+        # only the checker script in use receives the exact-path exemption.
+        with open(cls.checker, "a", encoding="utf-8", newline="\n") as f:
+            f.write("# " + cls.MARKER + "\n")
+        with open(cls.rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write("forbidden_patterns:\n  - " + cls.MARKER + "\n")
+        payload = cls.MARKER + "\n"
+        fixtures = {
+            "README.md": payload,
+            "sub/README.md": payload,
+            "sub/harness_rules.yaml": payload,
+            "sub/harness_check.py": payload,
+        }
+        for rel, content in fixtures.items():
+            with open(os.path.join(cls.repo, rel), "w", encoding="utf-8",
+                      newline="\n") as f:
+                f.write(content)
+        _git(cls.repo, "init", "-q")
+        _git(cls.repo, "add", "--", ".ci/harness_check.py",
+             ".ci/harness_rules.yaml", "README.md", "sub/README.md",
+             "sub/harness_rules.yaml", "sub/harness_check.py")
+
+        # A clean control repo isolates the legitimate in-use files so the
+        # positive exemption controls pass even while the decoys above are red.
+        cls.control_repo = tempfile.mkdtemp(prefix="helix_exemptions_", dir=cls.probe)
+        control_ci = os.path.join(cls.control_repo, ".ci")
+        os.makedirs(control_ci)
+        control_checker = os.path.join(control_ci, "harness_check.py")
+        control_rules = os.path.join(control_ci, "harness_rules.yaml")
+        shutil.copyfile(HARNESS, control_checker)
+        with open(control_checker, "a", encoding="utf-8", newline="\n") as f:
+            f.write("# " + cls.MARKER + "\n")
+        with open(control_rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write("forbidden_patterns:\n  - " + cls.MARKER + "\n")
+        _git(cls.control_repo, "init", "-q")
+        _git(cls.control_repo, "add", "--", ".ci/harness_check.py",
+             ".ci/harness_rules.yaml")
+
+        # A separate clean repo exercises grep's built-in secret fallbacks
+        # without the harmless forbidden-pattern markers from the decoy repo.
+        cls.secret_repo = tempfile.mkdtemp(prefix="helix_secret_grep_", dir=cls.probe)
+        secret_ci = os.path.join(cls.secret_repo, ".ci")
+        os.makedirs(secret_ci)
+        cls.secret_checker = os.path.join(secret_ci, "harness_check.py")
+        cls.secret_rules = os.path.join(secret_ci, "harness_rules.yaml")
+        shutil.copyfile(HARNESS, cls.secret_checker)
+        with open(cls.secret_rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write("forbidden_patterns:\n  - " + cls.MARKER + "\n")
+        os.makedirs(os.path.join(cls.secret_repo, "sub"))
+        for rel in ["README.md", "sub/README.md"]:
+            with open(os.path.join(cls.secret_repo, rel), "w", encoding="utf-8",
+                      newline="\n") as f:
+                f.write("plain README text\n")
+        _git(cls.secret_repo, "init", "-q")
+        _git(cls.secret_repo, "add", "--", ".ci/harness_check.py",
+             ".ci/harness_rules.yaml", "README.md", "sub/README.md")
+
+    @classmethod
+    def _module(cls, script=None):
+        import importlib.util
+
+        path = os.path.abspath(script or HARNESS)
+        if path not in cls._modules:
+            spec = importlib.util.spec_from_file_location(
+                "harness_check_failclosed_" + str(len(cls._modules)), path,
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            cls._modules[path] = module
+        return cls._modules[path]
+
+    @classmethod
+    def _run(cls, repo, cmd, script=None, rules=None, cwd=None, extra_env=None):
+        from contextlib import nullcontext, redirect_stdout
+        from io import StringIO
+        from unittest.mock import patch
+
+        _flush_test_adds(repo)
+        script = os.path.abspath(script or HARNESS)
+        module = cls._module(script)
+        args = [script, cmd]
+        if rules is not None:
+            args.extend(["--rules", rules])
+        args.extend(["--repo", repo])
+        old_cwd, old_argv = os.getcwd(), sys.argv[:]
+        output = StringIO()
+        env_patch = patch.dict(os.environ, extra_env, clear=True) if extra_env is not None else nullcontext()
+        try:
+            os.chdir(cwd or SCRIPT_DIR)
+            sys.argv = args
+            with env_patch, redirect_stdout(output):
+                rc = module.main()
+        finally:
+            sys.argv = old_argv
+            os.chdir(old_cwd)
+        return rc, output.getvalue()
+
+    @unittest.skipUnless(os.name == "nt", "requires Windows drive-letter paths")
+    def test_checker_outside_repo_drive_is_not_an_exemption(self):
+        module = self._module(HARNESS)
+        helper = getattr(module, "_is_exempt_file", None)
+        self.assertTrue(callable(helper), "checker must use normalized path exemptions")
+        if not callable(helper):
+            return
+        script_drive = os.path.splitdrive(os.path.abspath(HARNESS))[0].upper()
+        repo_drive = next(letter for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                          if letter + ":" != script_drive)
+        repo = repo_drive + ":\\helix_cross_drive_probe"
+        rules = os.path.join(repo, ".ci", "harness_rules.yaml")
+        try:
+            exempt = module._is_exempt_file(repo, "README.md", rules)
+        except ValueError as exc:
+            self.fail(f"checker outside the repo drive must not be exempt or raise: {exc}")
+        self.assertFalse(exempt)
+
+    def _assert_decoys_named(self, stage, out):
+        expected = [
+            "README.md", "sub/README.md", "sub/harness_rules.yaml",
+            "sub/harness_check.py",
+        ]
+        for rel in expected:
+            with self.subTest(stage=stage, rel=rel):
+                self.assertIn(f"[FAIL:{stage}] {rel}:", out)
+                self.assertIn(self.MARKER, out)
+
+    def test_a_staged_scans_readme_and_same_basename_decoys(self):
+        rc, out = self._run(
+            self.repo, "staged", script=self.checker, rules=self.rules,
+            cwd=self.repo,
+        )
+        self._assert_decoys_named("staged", out)
+        for rel in [".ci/harness_rules.yaml", ".ci/harness_check.py"]:
+            with self.subTest(exempt=rel):
+                self.assertNotIn(f"[FAIL:staged] {rel}:", out)
+        self.assertEqual(rc, 1, f"expected staged FAIL; out=\n{out}")
+
+    def test_a_grep_scans_readme_and_same_basename_decoys(self):
+        rc, out = self._run(
+            self.repo, "grep", script=self.checker, rules=self.rules,
+            cwd=self.repo,
+        )
+        self._assert_decoys_named("grep", out)
+        for rel in [".ci/harness_rules.yaml", ".ci/harness_check.py"]:
+            with self.subTest(exempt=rel):
+                self.assertNotIn(f"[FAIL:grep] {rel}:", out)
+        self.assertEqual(rc, 1, f"expected grep FAIL; out=\n{out}")
+
+    def test_a_grep_scans_builtin_secret_fallbacks_in_readmes(self):
+        token = "s" + "k" + "-" + "A" * 24
+        for rel in ["README.md", "sub/README.md"]:
+            with open(os.path.join(self.secret_repo, rel), "a", encoding="utf-8",
+                      newline="") as f:
+                f.write(token + "\n")
+        rc, out = self._run(
+            self.secret_repo, "grep", script=self.secret_checker,
+            rules=self.secret_rules, cwd=self.secret_repo,
+        )
+        self.assertEqual(rc, 1, f"expected grep FAIL on runtime token; out=\n{out}")
+        self.assertIn("API key", out)
+        self.assertNotIn(token, out)
+        for rel in ["README.md", "sub/README.md"]:
+            with self.subTest(rel=rel):
+                self.assertIn(f"[FAIL:grep] {rel}:", out)
+
+    def test_b_rules_file_exemption_uses_its_exact_path(self):
+        rc, out = self._run(
+            self.control_repo, "grep",
+            script=os.path.join(self.control_repo, ".ci", "harness_check.py"),
+            rules=os.path.join(self.control_repo, ".ci", "harness_rules.yaml"),
+            cwd=self.control_repo,
+        )
+        self.assertEqual(rc, 0, f"the exact in-use files must be exempt; out=\n{out}")
+        self.assertIn("[PASS]", out)
+        self.assertNotIn("[FAIL:grep] .ci/harness_rules.yaml:", out)
+        self.assertNotIn("[FAIL:grep] .ci/harness_check.py:", out)
+
+    def test_b_equivalent_rules_spelling_keeps_the_same_exemption(self):
+        rc, out = self._run(
+            self.control_repo, "grep",
+            script=os.path.join(self.control_repo, ".ci", "harness_check.py"),
+            rules="./.ci/../.ci/harness_rules.yaml", cwd=self.control_repo,
+        )
+        self.assertEqual(rc, 0, f"equivalent path spelling must retain exemption; out=\n{out}")
+        self.assertIn("[PASS]", out)
+        self.assertNotIn("[FAIL:grep] .ci/harness_rules.yaml:", out)
+        self.assertNotIn("[FAIL:grep] .ci/harness_check.py:", out)
+
+    def test_c_git_failures_fail_closed_for_all_gates_and_missing_git(self):
+        repo = tempfile.mkdtemp(prefix="helix_nongit_", dir=self.probe)
+        rc, out = self._run(repo, "all", rules=RULES)
+        self.assertEqual(rc, 1, f"all gates on non-git repo must fail; out=\n{out}")
+        for stage in ["staged", "ignore", "grep"]:
+            with self.subTest(stage=stage):
+                line = next((item for item in out.splitlines()
+                             if item.startswith(f"[FAIL:{stage}]")), "")
+                self.assertIn("git error", line.lower())
+
+        empty_path = tempfile.mkdtemp(prefix="helix_no_git_path_", dir=self.probe)
+        env = os.environ.copy()
+        env["PATH"] = empty_path
+        rc, out = self._run(
+            self.repo, "staged", script=self.checker, rules=self.rules,
+            cwd=self.repo, extra_env=env,
+        )
+        self.assertEqual(rc, 1, f"missing git binary must fail; out=\n{out}")
+        self.assertIn("git", out.lower())
+
+    def test_c_grep_reports_non_missing_tracked_read_errors(self):
+        import builtins
+
+        checker = self._module(self.secret_checker)
+        readme = os.path.abspath(os.path.join(self.secret_repo, "README.md"))
+        previous_open = checker.__dict__.get("open")
+
+        def denied_open(path, *args, **kwargs):
+            if os.path.abspath(os.fspath(path)) == readme:
+                raise PermissionError("probe read denied")
+            return builtins.open(path, *args, **kwargs)
+
+        checker.open = denied_open
+        try:
+            # Keep the two-argument call compatible with the original gate;
+            # the checker receives its exact in-use rules path from main().
+            fails = checker.cmd_grep(
+                self.secret_repo, {"forbidden_patterns": [self.MARKER]},
+            )
+        finally:
+            if previous_open is None:
+                del checker.open
+            else:
+                checker.open = previous_open
+        self.assertTrue(any("README.md" in item and "probe read denied" in item
+                            for item in fails), f"read error was skipped; fails={fails}")
+
+    def test_d_check_ignore_uses_rc_not_stderr(self):
+        from types import SimpleNamespace
+
+        checker = self._module(HARNESS)
+        original_run = checker.subprocess.run
+        statuses = iter([1, 0, 128])
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(list(argv))
+            return SimpleNamespace(
+                returncode=next(statuses), stdout="",
+                stderr="warning: cannot read global excludes file",
+            )
+
+        rules = {"is_public_repo": True, "sensitive_paths": ["private.txt"]}
+        checker.subprocess.run = fake_run
+        try:
+            with self.subTest(rc=1):
+                fails = checker.cmd_ignore(self.repo, rules)
+                self.assertTrue(any("private.txt" in item for item in fails))
+            with self.subTest(rc=0):
+                self.assertEqual(checker.cmd_ignore(self.repo, rules), [])
+            with self.subTest(rc=128):
+                self.assertTrue(hasattr(checker, "GitError"), "GitError must be defined")
+                if hasattr(checker, "GitError"):
+                    with self.assertRaises(checker.GitError):
+                        checker.cmd_ignore(self.repo, rules)
+        finally:
+            checker.subprocess.run = original_run
+        self.assertTrue(calls)
+        for argv in calls:
+            self.assertIn("check-ignore", argv)
+            self.assertIn("-q", argv)
+            self.assertIn("--", argv)
+
+    def test_e_explicit_missing_and_empty_rules_fail(self):
+        repo = tempfile.mkdtemp(prefix="helix_rules_repo_", dir=self.probe)
+        missing = os.path.join(self.probe, "explicit_missing_rules.yaml")
+        empty = os.path.join(self.probe, "explicit_empty_rules.yaml")
+        with open(empty, "w", encoding="utf-8", newline="\n") as f:
+            f.write("")
+        for rules in [missing, empty]:
+            with self.subTest(rules=rules):
+                rc, out = self._run(repo, "grep", rules=rules)
+                self.assertEqual(rc, 1, f"explicit invalid rules must fail; out=\n{out}")
+                self.assertIn("[FAIL:rules]", out)
+                self.assertIn("rules", out.lower())
+
+    def test_e_missing_default_rules_keeps_the_portable_skip(self):
+        repo = tempfile.mkdtemp(prefix="helix_no_default_rules_", dir=self.probe)
+        rc, out = self._run(repo, "grep")
+        self.assertEqual(rc, 0, f"missing implicit default should skip; out=\n{out}")
+        self.assertIn("[harness]", out)
+        self.assertIn("exit 0", out)
+
+    def test_f_real_tree_passes_all(self):
+        repo = tempfile.mkdtemp(prefix="helix_real_tree_", dir=self.probe)
+        # "Real tree" = the files git tracks here, never the raw working directory
+        # (which holds .git, caches, build output, local-only docs ...).
+        listing = subprocess.run(
+            ["git", "-C", SCRIPT_DIR, "ls-files"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
+        )
+        if listing.returncode != 0 or not listing.stdout.strip():
+            self.skipTest("not a git checkout: tracked-file listing unavailable")
+        files = sorted(rel for rel in listing.stdout.splitlines() if rel.strip())
+        for rel in files:
+            src = os.path.join(SCRIPT_DIR, *rel.split("/"))
+            if not os.path.isfile(src):
+                continue  # tracked but deleted in this working tree
+            dst = os.path.join(repo, *rel.split("/"))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(src, dst)
+        files = [rel for rel in files if os.path.isfile(os.path.join(repo, *rel.split("/")))]
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "probe@test.local")
+        _git(repo, "config", "user.name", "probe")
+        _git(repo, "add", "--", *files)
+        _git(repo, "commit", "-qm", "clean real-tree baseline")
+        script = os.path.join(repo, ".ci", "harness_check.py")
+        rc, out = self._run(
+            repo, "all", script=script, rules=".ci/harness_rules.yaml", cwd=repo,
+        )
+        self.assertEqual(rc, 0, f"the real tree must pass all gates; out=\n{out}")
+        self.assertIn("[PASS]", out)
+
+
+    def _new_path_repo(self):
+        repo = tempfile.mkdtemp(prefix="helix_path_names_", dir=self.probe)
+        ci = os.path.join(repo, ".ci")
+        os.makedirs(ci)
+        checker = os.path.join(ci, "harness_check.py")
+        rules = os.path.join(ci, "harness_rules.yaml")
+        shutil.copyfile(HARNESS, checker)
+        with open(rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write("forbidden_patterns:\n  - " + self.MARKER + "\n")
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "probe@test.local")
+        _git(repo, "config", "user.name", "probe")
+        _git(repo, "add", "--", ".ci/harness_check.py", ".ci/harness_rules.yaml")
+        _git(repo, "commit", "-qm", "path scan baseline")
+        return repo, checker, rules
+
+    def _write_path_file(self, repo, name, content):
+        path = os.path.join(repo, name)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+
+    def _commit_path_file(self, repo, name, content, message):
+        self._write_path_file(repo, name, content)
+        _git(repo, "add", "--", name)
+        _git(repo, "commit", "-qm", message)
+
+    def _stage_marker_path(self, name):
+        repo, checker, rules = self._new_path_repo()
+        self._write_path_file(repo, name, self.MARKER + "\n")
+        _git(repo, "add", "--", name)
+        return self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+
+    def test_staged_non_ascii_path_reports_the_forbidden_content(self):
+        name = "\u79d8\u5bc6.txt"
+        rc, out = self._stage_marker_path(name)
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_staged_space_path_reports_the_forbidden_content(self):
+        name = "file with spaces.txt"
+        rc, out = self._stage_marker_path(name)
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_staged_bracket_path_uses_a_literal_pathspec(self):
+        name = "a[1].txt"
+        repo, checker, rules = self._new_path_repo()
+        try:
+            self._write_path_file(repo, name, self.MARKER + "\n")
+        except OSError as exc:
+            self.skipTest(f"platform cannot create bracket path: {exc}")
+        _git(repo, "add", "--", name)
+        module = self._module(checker)
+        original_run = module.subprocess.run
+        calls = []
+
+        def record_run(argv, **kwargs):
+            calls.append(list(argv))
+            return original_run(argv, **kwargs)
+
+        module.subprocess.run = record_run
+        try:
+            rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        finally:
+            module.subprocess.run = original_run
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+        diff_calls = [argv for argv in calls if "diff" in argv and "-U0" in argv]
+        self.assertTrue(
+            any("--literal-pathspecs" in argv and argv.index("--literal-pathspecs") < argv.index("diff")
+                for argv in diff_calls),
+            f"per-file diff must use literal pathspecs; calls={diff_calls}",
+        )
+
+    def test_staged_forbidden_name_rule_matches_non_ascii_path(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u79d8\u5bc6.txt"
+        with open(rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "forbidden_patterns:\n  - " + self.MARKER
+                + "\nforbidden_staged_names:\n  - " + name + "\n"
+            )
+        self._write_path_file(repo, name, "plain text\n")
+        _git(repo, "add", "--", name)
+        rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"expected forbidden staged name; out=\n{out}")
+        self.assertIn("\u7981\u7528\u6587\u4ef6\u88ab\u6682\u5b58", out)
+        self.assertIn(name, out)
+
+    def test_grep_non_ascii_path_reports_forbidden_content(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u9690\u85cf\u5185\u5bb9.txt"
+        self._commit_path_file(repo, name, self.MARKER + "\n", "add marked path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"expected tracked content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:grep] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_grep_harmless_non_ascii_path_passes(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u666e\u901a\u6587\u4ef6.txt"
+        self._commit_path_file(repo, name, "plain text\n", "add harmless path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 0, f"harmless tracked path must pass; out=\n{out}")
+        self.assertIn("[PASS]", out)
+        self.assertNotIn(f"[FAIL:grep] {name}:", out)
+
+    def test_grep_ascii_path_control_passes(self):
+        repo, checker, rules = self._new_path_repo()
+        self._commit_path_file(repo, "plain.txt", "plain text\n", "add ASCII path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 0, f"harmless ASCII path must pass; out=\n{out}")
+        self.assertIn("[PASS]", out)
+
+    @unittest.skipUnless(os.name == "posix", "the platform cannot create raw-byte filenames")
+    def test_invalid_utf8_path_fails_closed_in_staged_and_grep(self):
+        repo, checker, rules = self._new_path_repo()
+        raw_name = b"bad_\xff.txt"
+        path = os.fsencode(repo) + os.sep.encode() + raw_name
+        fd = os.open(path, os.O_CREAT | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(b"plain text\n")
+        name = os.fsdecode(raw_name)
+        _git(repo, "add", "--", name)
+        byte_token = raw_name.hex()
+        rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"invalid staged path must fail closed; out=\n{out}")
+        self.assertIn("invalid UTF-8", out)
+        self.assertIn(byte_token, out)
+        _git(repo, "commit", "-qm", "add byte path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"invalid tracked path must fail closed; out=\n{out}")
+        self.assertIn("invalid UTF-8", out)
+        self.assertIn(byte_token, out)
+
+    def test_default_rules_directory_fails_clearly(self):
+        repo, checker, _ = self._new_path_repo()
+        os.mkdir(os.path.join(repo, "harness_rules.yaml"))
+        rc, out = self._run(repo, "grep", script=checker, cwd=repo)
+        self.assertEqual(rc, 1, f"a default rules directory must fail; out=\n{out}")
+        self.assertIn("[FAIL:rules]", out)
+        self.assertIn("regular file", out)
+
+    def test_cleanup_removes_a_committed_git_tree(self):
+        repo = tempfile.mkdtemp(prefix="helix_cleanup_repo_")
+        self.addCleanup(_remove_tree, repo)
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "probe@test.local")
+        _git(repo, "config", "user.name", "probe")
+        with open(os.path.join(repo, "committed.txt"), "w", encoding="utf-8",
+                  newline="\n") as f:
+            f.write("committed data\n")
+        _git(repo, "add", "--", "committed.txt")
+        _git(repo, "commit", "-qm", "create cleanup fixture")
+        _remove_tree(repo)
+        self.assertFalse(os.path.exists(repo), "the committed repository tree must be removed")
 
 
 if __name__ == "__main__":
