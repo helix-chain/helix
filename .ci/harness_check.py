@@ -84,6 +84,41 @@ def _git(repo, *a, allow_returncodes=()):
     return r
 
 
+def _git_bytes(repo, *a, allow_returncodes=(), literal_pathspecs=False):
+    argv = ['git']
+    if literal_pathspecs:
+        argv.append('--literal-pathspecs')
+    argv.extend(['-C', repo, *a])
+    try:
+        r = subprocess.run(argv, capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise GitError(f'{e}') from e
+    allowed = {0, *allow_returncodes}
+    if r.returncode not in allowed:
+        detail = (r.stderr or b'').decode('utf-8', errors='replace').strip()
+        if not detail:
+            detail = (r.stdout or b'').decode('utf-8', errors='replace').strip()
+        if not detail:
+            detail = f'exit code {r.returncode}'
+        raise GitError(detail)
+    return r
+
+
+def _nul_paths(output, fails):
+    raw_paths = output.split(b'\0')
+    if raw_paths and raw_paths[-1] == b'':
+        raw_paths.pop()
+    paths = []
+    for raw in raw_paths:
+        if not raw:
+            continue
+        try:
+            paths.append(raw.decode('utf-8'))
+        except UnicodeDecodeError:
+            fails.append(f'invalid UTF-8 path (hex): {raw.hex()}')
+    return paths
+
+
 def _is_exempt_file(repo, file_path, rules_path):
     """Match only the in-repo rules file and this checker by normalized path."""
     repo_abs = os.path.abspath(os.path.normpath(repo))
@@ -117,7 +152,9 @@ def _is_exempt_file(repo, file_path, rules_path):
 
 def cmd_staged(repo, rules, rules_path=None):
     fails = []
-    files = [l for l in _git(repo, 'diff', '--cached', '--name-only').stdout.splitlines() if l.strip()]
+    files = _nul_paths(
+        _git_bytes(repo, 'diff', '--cached', '--name-only', '-z').stdout, fails,
+    )
     names = rules.get('forbidden_staged_names', [])
     forb = rules.get('forbidden_patterns', [])
     for f in files:
@@ -127,7 +164,9 @@ def cmd_staged(repo, rules, rules_path=None):
                 fails.append(f'禁用文件被暂存: {f} (匹配 {pat})')
         if _is_exempt_file(repo, f, rules_path):
             continue
-        diff = _git(repo, 'diff', '--cached', '-U0', '--', f).stdout
+        diff = _git_bytes(
+            repo, 'diff', '--cached', '-U0', '--', f, literal_pathspecs=True,
+        ).stdout.decode('utf-8', errors='replace')
         added = '\n'.join(l[1:] for l in diff.splitlines()
                           if l.startswith('+') and not l.startswith('+++'))
         for pat in forb:
@@ -160,7 +199,7 @@ def cmd_ignore(repo, rules):
 def cmd_grep(repo, rules, rules_path=None):
     fails = []
     forb = rules.get('forbidden_patterns', [])
-    tracked = [l for l in _git(repo, 'ls-files').stdout.splitlines() if l.strip()]
+    tracked = _nul_paths(_git_bytes(repo, 'ls-files', '-z').stdout, fails)
     for f in tracked:
         if _is_exempt_file(repo, f, rules_path):
             continue
@@ -210,11 +249,14 @@ def main():
     repo = os.path.abspath(args.repo)
     explicit_rules = args.rules is not None
     rules_path = args.rules if explicit_rules else os.path.join(repo, 'harness_rules.yaml')
-    if not os.path.isfile(rules_path):
+    if not os.path.exists(rules_path):
         if not explicit_rules:
             print(f'[harness] 无规则文件（{rules_path}）→ 跳过 (exit 0)。见 project_rules.example.yaml')
             return 0
         print(f'[FAIL:rules] rules file not found: {rules_path}')
+        return 1
+    if not os.path.isfile(rules_path):
+        print(f'[FAIL:rules] rules path is not a regular file: {rules_path}')
         return 1
     try:
         rules = _load_rules(rules_path)

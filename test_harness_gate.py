@@ -1,6 +1,6 @@
 """
 test_harness_gate.py
-Version: V1.4
+Version: V1.5
 
 Probe self-test for the deterministic harness gate (.ci/harness_check.py +
 .ci/harness_rules.yaml). Proves the gate actually BITES: dangerous staged
@@ -72,17 +72,41 @@ same-basename decoys (including built-in secret fallbacks), tracked-file read
 errors, Git command errors and return-code semantics, explicit rules-file
 failures, the portable missing-default-rules skip, and a real-tree positive
 control. Secret-shaped test data is assembled at runtime.
+
+V1.5 additions (path handling and cleanup)
+-------------------------------------------
+Adds coverage for NUL-delimited Git path lists, literal pathspecs, Unicode
+names, invalid UTF-8 paths, default rules directories, and read-only Git-tree
+cleanup.
 """
 
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _retry_readonly_removal(function, path, exc_info):
+    try:
+        os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        function(path)
+    except OSError:
+        raise
+
+
+def _remove_tree(path):
+    if os.path.lexists(path):
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(path, onexc=_retry_readonly_removal)
+        else:
+            shutil.rmtree(path, onerror=_retry_readonly_removal)
+
+
 HARNESS = os.path.join(SCRIPT_DIR, ".ci", "harness_check.py")
 RULES = os.path.join(SCRIPT_DIR, ".ci", "harness_rules.yaml")
 
@@ -450,7 +474,7 @@ class HarnessGateProbe(unittest.TestCase):
 
     def tearDown(self):
         # shutil.rmtree is a Python call, not a shell recursive delete.
-        shutil.rmtree(self.repo, ignore_errors=True)
+        _remove_tree(self.repo)
 
     def _write(self, rel, content):
         path = os.path.join(self.repo, rel)
@@ -540,7 +564,7 @@ class HarnessGateProbe(unittest.TestCase):
         try:
             rc, out = self._run_drift_fixture(extra_env=env)
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("overall_mismatch_score", out)
         self.assertIn("required 未满足: mismatch_detector.py", out)
@@ -622,7 +646,7 @@ class HarnessGateProbe(unittest.TestCase):
             )
             self.assertIn("[PASS]", out)
         finally:
-            shutil.rmtree(os.path.dirname(no_emit), ignore_errors=True)
+            _remove_tree(os.path.dirname(no_emit))
 
     # --- service_role secret rule, under BOTH parser paths ----------------
 
@@ -706,7 +730,7 @@ class HarnessGateProbe(unittest.TestCase):
         try:
             rc, out = _run_gate(self.repo, "grep", extra_env=env)
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
         self.assertEqual(rc, 1, f"expected FAIL under minimal parser; out=\n{out}")
         self.assertIn("service_role", out)
 
@@ -760,7 +784,7 @@ class RealTreeAnchorProbe(unittest.TestCase):
             _git(self.repo, "add", "--", rel)
 
     def tearDown(self):
-        shutil.rmtree(self.repo, ignore_errors=True)
+        _remove_tree(self.repo)
 
     def _path(self, rel):
         return os.path.join(self.repo, rel)
@@ -808,7 +832,7 @@ class RealTreeAnchorProbe(unittest.TestCase):
         try:
             yield "minimal", env
         finally:
-            shutil.rmtree(shim, ignore_errors=True)
+            _remove_tree(shim)
 
     def test_a_positive_control_real_files_pass_both_parsers(self):
         """(a) The unmodified REAL consumer files must satisfy every anchor."""
@@ -893,7 +917,7 @@ class FailClosedHarnessProbe(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         # shutil.rmtree is a Python call on our own mkdtemp() root, not a shell delete.
-        shutil.rmtree(cls.probe, ignore_errors=True)
+        _remove_tree(cls.probe)
 
     @classmethod
     def setUpClass(cls):
@@ -1226,6 +1250,170 @@ class FailClosedHarnessProbe(unittest.TestCase):
         )
         self.assertEqual(rc, 0, f"the real tree must pass all gates; out=\n{out}")
         self.assertIn("[PASS]", out)
+
+
+    def _new_path_repo(self):
+        repo = tempfile.mkdtemp(prefix="helix_path_names_", dir=self.probe)
+        ci = os.path.join(repo, ".ci")
+        os.makedirs(ci)
+        checker = os.path.join(ci, "harness_check.py")
+        rules = os.path.join(ci, "harness_rules.yaml")
+        shutil.copyfile(HARNESS, checker)
+        with open(rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write("forbidden_patterns:\n  - " + self.MARKER + "\n")
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "probe@test.local")
+        _git(repo, "config", "user.name", "probe")
+        _git(repo, "add", "--", ".ci/harness_check.py", ".ci/harness_rules.yaml")
+        _git(repo, "commit", "-qm", "path scan baseline")
+        return repo, checker, rules
+
+    def _write_path_file(self, repo, name, content):
+        path = os.path.join(repo, name)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+
+    def _commit_path_file(self, repo, name, content, message):
+        self._write_path_file(repo, name, content)
+        _git(repo, "add", "--", name)
+        _git(repo, "commit", "-qm", message)
+
+    def _stage_marker_path(self, name):
+        repo, checker, rules = self._new_path_repo()
+        self._write_path_file(repo, name, self.MARKER + "\n")
+        _git(repo, "add", "--", name)
+        return self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+
+    def test_staged_non_ascii_path_reports_the_forbidden_content(self):
+        name = "\u79d8\u5bc6.txt"
+        rc, out = self._stage_marker_path(name)
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_staged_space_path_reports_the_forbidden_content(self):
+        name = "file with spaces.txt"
+        rc, out = self._stage_marker_path(name)
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_staged_bracket_path_uses_a_literal_pathspec(self):
+        name = "a[1].txt"
+        repo, checker, rules = self._new_path_repo()
+        try:
+            self._write_path_file(repo, name, self.MARKER + "\n")
+        except OSError as exc:
+            self.skipTest(f"platform cannot create bracket path: {exc}")
+        _git(repo, "add", "--", name)
+        module = self._module(checker)
+        original_run = module.subprocess.run
+        calls = []
+
+        def record_run(argv, **kwargs):
+            calls.append(list(argv))
+            return original_run(argv, **kwargs)
+
+        module.subprocess.run = record_run
+        try:
+            rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        finally:
+            module.subprocess.run = original_run
+        self.assertEqual(rc, 1, f"expected staged content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:staged] {name}:", out)
+        self.assertIn(self.MARKER, out)
+        diff_calls = [argv for argv in calls if "diff" in argv and "-U0" in argv]
+        self.assertTrue(
+            any("--literal-pathspecs" in argv and argv.index("--literal-pathspecs") < argv.index("diff")
+                for argv in diff_calls),
+            f"per-file diff must use literal pathspecs; calls={diff_calls}",
+        )
+
+    def test_staged_forbidden_name_rule_matches_non_ascii_path(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u79d8\u5bc6.txt"
+        with open(rules, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "forbidden_patterns:\n  - " + self.MARKER
+                + "\nforbidden_staged_names:\n  - " + name + "\n"
+            )
+        self._write_path_file(repo, name, "plain text\n")
+        _git(repo, "add", "--", name)
+        rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"expected forbidden staged name; out=\n{out}")
+        self.assertIn("\u7981\u7528\u6587\u4ef6\u88ab\u6682\u5b58", out)
+        self.assertIn(name, out)
+
+    def test_grep_non_ascii_path_reports_forbidden_content(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u9690\u85cf\u5185\u5bb9.txt"
+        self._commit_path_file(repo, name, self.MARKER + "\n", "add marked path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"expected tracked content failure; out=\n{out}")
+        self.assertIn(f"[FAIL:grep] {name}:", out)
+        self.assertIn(self.MARKER, out)
+
+    def test_grep_harmless_non_ascii_path_passes(self):
+        repo, checker, rules = self._new_path_repo()
+        name = "\u666e\u901a\u6587\u4ef6.txt"
+        self._commit_path_file(repo, name, "plain text\n", "add harmless path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 0, f"harmless tracked path must pass; out=\n{out}")
+        self.assertIn("[PASS]", out)
+        self.assertNotIn(f"[FAIL:grep] {name}:", out)
+
+    def test_grep_ascii_path_control_passes(self):
+        repo, checker, rules = self._new_path_repo()
+        self._commit_path_file(repo, "plain.txt", "plain text\n", "add ASCII path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 0, f"harmless ASCII path must pass; out=\n{out}")
+        self.assertIn("[PASS]", out)
+
+    @unittest.skipUnless(os.name == "posix", "the platform cannot create raw-byte filenames")
+    def test_invalid_utf8_path_fails_closed_in_staged_and_grep(self):
+        repo, checker, rules = self._new_path_repo()
+        raw_name = b"bad_\xff.txt"
+        path = os.fsencode(repo) + os.sep.encode() + raw_name
+        fd = os.open(path, os.O_CREAT | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(b"plain text\n")
+        name = os.fsdecode(raw_name)
+        _git(repo, "add", "--", name)
+        byte_token = raw_name.hex()
+        rc, out = self._run(repo, "staged", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"invalid staged path must fail closed; out=\n{out}")
+        self.assertIn("invalid UTF-8", out)
+        self.assertIn(byte_token, out)
+        _git(repo, "commit", "-qm", "add byte path")
+        rc, out = self._run(repo, "grep", script=checker, rules=rules, cwd=repo)
+        self.assertEqual(rc, 1, f"invalid tracked path must fail closed; out=\n{out}")
+        self.assertIn("invalid UTF-8", out)
+        self.assertIn(byte_token, out)
+
+    def test_default_rules_directory_fails_clearly(self):
+        repo, checker, _ = self._new_path_repo()
+        os.mkdir(os.path.join(repo, "harness_rules.yaml"))
+        rc, out = self._run(repo, "grep", script=checker, cwd=repo)
+        self.assertEqual(rc, 1, f"a default rules directory must fail; out=\n{out}")
+        self.assertIn("[FAIL:rules]", out)
+        self.assertIn("regular file", out)
+
+    def test_cleanup_removes_a_committed_git_tree(self):
+        repo = tempfile.mkdtemp(prefix="helix_cleanup_repo_")
+        self.addCleanup(_remove_tree, repo)
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "probe@test.local")
+        _git(repo, "config", "user.name", "probe")
+        with open(os.path.join(repo, "committed.txt"), "w", encoding="utf-8",
+                  newline="\n") as f:
+            f.write("committed data\n")
+        _git(repo, "add", "--", "committed.txt")
+        _git(repo, "commit", "-qm", "create cleanup fixture")
+        _remove_tree(repo)
+        self.assertFalse(os.path.exists(repo), "the committed repository tree must be removed")
 
 
 if __name__ == "__main__":
