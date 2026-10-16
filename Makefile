@@ -8,6 +8,7 @@
 
 contract-test:  ## Detector output data-contract regression (no torch/transformers)
 	python test_output_contract.py
+	python test_replay_gate.py
 
 smoke-ci:  ## Run CI smoke test (SafeToken→LOW, VulnerableVault→CRITICAL)
 	python ci_smoke_test.py
