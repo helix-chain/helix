@@ -156,7 +156,14 @@ def _valid_result(risk_level="LOW", **overrides):
     result = {
         "risk_level": risk_level,
         "overall_mismatch_score": 0.5,
-        "functions": [],
+        "functions": [{
+            "name": "f",
+            "intent": "f",
+            "code_behavior": "standard function implementation",
+            "mismatch_score": 0.5,
+            "attack_class": None,
+            "evidence": "",
+        }],
         "recommended_action": "x",
         "contract_address": None,
     }
@@ -263,6 +270,39 @@ class TestCliExitContract(unittest.TestCase):
         self.assertEqual(out, "")
         self.assertIn("[ERROR]", err)
         self.assertIn("risk_level", err)
+
+    def test_empty_function_list_exits_2_whatever_the_message(self):
+        """A result with no analysed functions is never a verdict, whatever the
+        accompanying recommended_action text says: exit 2, nothing on stdout
+        derived from the result, and a loud stderr line."""
+        expected_human_out = "  Scanning: %s\n" % self._sol_path
+        for message in ("No analyzable Solidity functions detected.", "x", ""):
+            for json_mode in (True, False):
+                with self.subTest(message=message, json=json_mode):
+                    result = _valid_result("LOW", functions=[], recommended_action=message)
+                    code, out, err = self._run_cli(result, json_mode=json_mode)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(out, "" if json_mode else expected_human_out)
+                    self.assertIn("[ERROR]", err)
+
+    def test_missing_function_list_or_empty_high_result_exits_2(self):
+        """No analysed function is never a verdict: a result without the
+        'functions' key, or with an empty list next to a HIGH / CRITICAL level,
+        exits 2 like the empty LOW result."""
+        no_key = _valid_result("LOW")
+        del no_key["functions"]
+        cases = (
+            ("functions key missing", no_key),
+            ("empty list, HIGH", _valid_result("HIGH", functions=[])),
+            ("empty list, CRITICAL", _valid_result("CRITICAL", functions=[])),
+        )
+        for label, result in cases:
+            for json_mode in (True, False):
+                with self.subTest(case=label, json=json_mode):
+                    code, out, err = self._run_cli(result, json_mode=json_mode)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(out, "" if json_mode else "  Scanning: %s\n" % self._sol_path)
+                    self.assertIn("[ERROR]", err)
 
     def test_invalid_value_json_exits_2(self):
         """Legacy name kept: --json, unknown risk_level -> exit 2, stdout empty."""

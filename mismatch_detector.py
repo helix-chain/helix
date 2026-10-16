@@ -7,6 +7,7 @@ Tech stack: Python 3.11 + PyTorch 2.3 + sentence-transformers + pgvector
 """
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Optional
 import numpy as np
 
@@ -51,6 +52,300 @@ class FunctionMismatch:
 # 2. Intent Extractor
 # ─────────────────────────────────────────────
 
+def mask_comments_and_strings(source: str) -> str:
+    """Blank comments and string contents without changing source offsets."""
+    masked = list(source)
+    length = len(source)
+    index = 0
+    line_terminators = "\r\n\v\f\x85\u2028\u2029"
+
+    def blank(position: int) -> None:
+        if source[position] not in line_terminators:
+            masked[position] = " "
+
+    while index < length:
+        if source.startswith("//", index):
+            end = index
+            while end < length and source[end] not in line_terminators:
+                end += 1
+            for position in range(index, end):
+                blank(position)
+            index = end
+            continue
+
+        if source.startswith("/*", index):
+            end = source.find("*/", index + 2)
+            stop = length if end < 0 else end + 2
+            for position in range(index, stop):
+                blank(position)
+            index = stop
+            continue
+
+        quote = source[index]
+        if quote not in "\"'":
+            index += 1
+            continue
+
+        masked_end = index + 1
+        while masked_end < length and source[masked_end].isspace():
+            masked_end += 1
+        if masked_end < length and source[masked_end] == quote:
+            index = masked_end + 1
+            continue
+
+        index += 1
+        while index < length:
+            char = source[index]
+            if char == "\\":
+                blank(index)
+                if index + 1 >= length:
+                    index += 1
+                    break
+                if source[index + 1] == "\r":
+                    if index + 2 < length and source[index + 2] == "\n":
+                        index += 3
+                    else:
+                        index += 2
+                    continue
+                if source[index + 1] == "\n":
+                    index += 2
+                    continue
+                if source[index + 1] in line_terminators:
+                    index += 1
+                    break
+                blank(index + 1)
+                index += 2
+                continue
+            if char == quote:
+                index += 1
+                break
+            if char in line_terminators:
+                break
+            blank(index)
+            index += 1
+
+    return "".join(masked)
+
+
+@dataclass(frozen=True)
+class FunctionUnit:
+    """A named Solidity function definition or declaration span."""
+    name: str
+    kind: str
+    start: int
+    body_offset: int
+    end: int
+    has_body: bool
+
+
+def _extract_function_units_from_masked(masked_source: str) -> tuple[FunctionUnit, ...]:
+    """Extract named and special function units from masked source."""
+    import re
+
+    identifier_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+    token_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*|\S")
+    tokens = [(match.group(), match.start(), match.end())
+              for match in token_pattern.finditer(masked_source)]
+    parentheses = {}
+    braces = {}
+    paren_stack = []
+    brace_stack = []
+
+    for token_index, (value, _, _) in enumerate(tokens):
+        if value == "(":
+            paren_stack.append(token_index)
+        elif value == ")" and paren_stack:
+            opening = paren_stack.pop()
+            parentheses[opening] = token_index
+        elif value == "{":
+            brace_stack.append(token_index)
+        elif value == "}" and brace_stack:
+            opening = brace_stack.pop()
+            braces[opening] = token_index
+
+    # The forward walk from a token is the same whichever header started it, so
+    # its result is remembered for every token it passed: each token is walked
+    # once even when many headers lack a terminator.
+    terminator_from = {}
+
+    def find_terminator(parameter_close: int):
+        cursor = parameter_close + 1
+        walked = []
+        result = None
+        while cursor < len(tokens):
+            if cursor in terminator_from:
+                result = terminator_from[cursor]
+                break
+            walked.append(cursor)
+            value = tokens[cursor][0]
+            if value == "(":
+                close = parentheses.get(cursor)
+                if close is None:
+                    break
+                cursor = close + 1
+                continue
+            if value in (")", "}"):
+                break
+            if value in ("{", ";"):
+                result = cursor
+                break
+            cursor += 1
+        for position in walked:
+            terminator_from[position] = result
+        return result
+
+    external_before = [0]
+    for value, _, _ in tokens:
+        external_before.append(external_before[-1] + (value == "external"))
+
+    def make_unit(name: str, kind: str, start_index: int, terminator: int):
+        value, body_offset, term_end = tokens[terminator]
+        if value == ";":
+            return FunctionUnit(
+                name=name, kind=kind, start=tokens[start_index][1],
+                body_offset=body_offset, end=term_end, has_body=False,
+            )
+        closing = braces.get(terminator)
+        end_offset = len(masked_source) if closing is None else tokens[closing][2]
+        return FunctionUnit(
+            name=name, kind=kind, start=tokens[start_index][1],
+            body_offset=body_offset, end=end_offset, has_body=True,
+        )
+
+    units = []
+    for token_index, (value, start_offset, _) in enumerate(tokens):
+        if value == "function":
+            if token_index + 2 < len(tokens):
+                name_token = tokens[token_index + 1]
+                opening = token_index + 2
+                if (identifier_pattern.fullmatch(name_token[0])
+                        and tokens[opening][0] == "("):
+                    parameter_close = parentheses.get(opening)
+                    if parameter_close is not None:
+                        terminator = find_terminator(parameter_close)
+                        if terminator is not None:
+                            units.append(make_unit(name_token[0], "function", token_index, terminator))
+                    continue
+
+            if token_index + 1 < len(tokens) and tokens[token_index + 1][0] == "(":
+                previous_character = tokens[token_index - 1][0][-1] if token_index else ""
+                if previous_character in ("{", "}", ";", ""):
+                    opening = token_index + 1
+                    parameter_close = parentheses.get(opening)
+                    if parameter_close is not None:
+                        terminator = find_terminator(parameter_close)
+                        if (terminator is not None and tokens[terminator][0] == "{"):
+                            units.append(make_unit("fallback", "fallback", token_index, terminator))
+            continue
+
+        if value not in ("receive", "fallback"):
+            continue
+        if token_index:
+            previous = tokens[token_index - 1][0]
+            if previous == "." or identifier_pattern.fullmatch(previous):
+                continue
+        if token_index + 1 >= len(tokens) or tokens[token_index + 1][0] != "(":
+            continue
+        opening = token_index + 1
+        parameter_close = parentheses.get(opening)
+        if parameter_close is None:
+            continue
+        terminator = find_terminator(parameter_close)
+        if terminator is None or tokens[terminator][0] != "{":
+            continue
+        if external_before[terminator] == external_before[parameter_close + 1]:
+            continue  # the header between the parameters and the body has no external
+        units.append(make_unit(value, value, token_index, terminator))
+
+    units.sort(key=lambda unit: unit.start)
+    return tuple(units)
+
+
+@lru_cache(maxsize=16)
+def _source_index(source: str) -> tuple[str, tuple[FunctionUnit, ...]]:
+    """Cache the masked source and its parsed function units for one input."""
+    masked = mask_comments_and_strings(source)
+    return masked, _extract_function_units_from_masked(masked)
+
+
+@lru_cache(maxsize=16)
+def _first_bodies(source: str) -> dict:
+    """Map each name to its first unit with a body (one pass per input)."""
+    first = {}
+    for unit in _source_index(source)[1]:
+        if unit.has_body and unit.name not in first:
+            first[unit.name] = unit
+    return first
+
+
+def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:
+    """Return named function definitions and declarations in source order."""
+    return _source_index(source)[1]
+
+
+def _doc_comment_block(gap: str) -> str:
+    """Return the documentation comments that end right before a definition.
+
+    gap is the text between the preceding code and the definition, so it holds
+    only comments and whitespace. The result is what the comment-block group
+    of the original per-function expression captures when it is anchored at
+    the definition:
+
+        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\n)*)[ \\t]*\\Z
+
+    That is the run of items starting at the leftmost position from which the
+    rest of the gap splits into items (a /// line, or anything from /* to a */
+    that is followed by blanks and a line feed) plus trailing blanks. As in
+    the original, a block comment whose line ends in CR LF does not count as
+    documentation. The expression can backtrack exponentially when the split
+    fails; here every position is decided once, from the end, so the work is
+    linear in the gap length. A blank line between the comments and the
+    definition ends the run.
+    """
+    length = len(gap)
+    boundary = length  # the run of items must end before the trailing blanks
+    while boundary > 0 and gap[boundary - 1] in " \t":
+        boundary -= 1
+    if boundary == 0 or gap[boundary - 1] != "\n":
+        return ""
+
+    # splits_from[i]: gap[i:] is a sequence of items followed by trailing blanks.
+    splits_from = [False] * (length + 3)
+    for index in range(boundary, length + 1):
+        splits_from[index] = True
+    # block_end_from[i]: some "*/ blanks [CR] LF" whose "*/" starts at >= i ends
+    # exactly where the rest of the gap splits.
+    block_end_from = [False] * (length + 3)
+    next_line_feed = [length] * (length + 1)
+    after_blanks = list(range(length + 1))
+    line_feed = length
+    for index in range(length - 1, -1, -1):
+        if gap[index] == "\n":
+            line_feed = index
+        next_line_feed[index] = line_feed
+        if gap[index] in " \t":
+            after_blanks[index] = after_blanks[index + 1]
+
+    for index in range(boundary - 1, -1, -1):
+        ends_here = False
+        if gap.startswith("*/", index):
+            cursor = after_blanks[index + 2]
+            ends_here = cursor < length and gap[cursor] == "\n" and splits_from[cursor + 1]
+        block_end_from[index] = ends_here or block_end_from[index + 1]
+
+        start = after_blanks[index]
+        if gap.startswith("///", start):
+            line_end = next_line_feed[start]
+            if line_end < length and splits_from[line_end + 1]:
+                splits_from[index] = True
+                continue
+        if gap.startswith("/*", start) and block_end_from[start + 2]:
+            splits_from[index] = True
+
+    first = next(index for index in range(length + 1) if splits_from[index])
+    return gap[first:boundary] if first < boundary else ""
+
+
 class IntentExtractor:
     """
     Extracts human intent from Solidity NatSpec comments and function names.
@@ -60,22 +355,26 @@ class IntentExtractor:
     def extract(self, source_code: str) -> dict[str, str]:
         import re
         results = {}
-        # Match function with ALL preceding comment lines
-        func_pattern = r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*function\s+(\w+)\s*\("
-        for match in re.finditer(func_pattern, source_code):
-            comment_block = match.group(1)
-            func_name = match.group(2)
-            # Extract meaningful text from NatSpec
+        masked, units = _source_index(source_code)
+        for unit in units:
+            if not unit.has_body:
+                continue
+            # Only the comments and whitespace between the preceding code and
+            # this definition can document it. Reading that gap (instead of the
+            # whole prefix) keeps extraction linear and keeps string contents out.
+            gap_start = unit.start
+            while gap_start > 0 and masked[gap_start - 1].isspace():
+                gap_start -= 1
+            comment_block = _doc_comment_block(source_code[gap_start:unit.start])
             parts = re.findall(r"@notice\s+(.+)|@dev\s+(.+)|///\s*(.+)", comment_block)
             intent_parts = [p[0] or p[1] or p[2] for p in parts if any(p)]
             intent_text = " ".join(intent_parts).strip()
             if not intent_text and comment_block:
-                # Strip comment markers and get raw text
                 raw = re.sub(r"[/*@]|\bparam\b|\breturns\b", " ", comment_block)
                 intent_text = " ".join(raw.split())[:200]
             if not intent_text:
-                intent_text = func_name.replace("_", " ")
-            results[func_name] = intent_text
+                intent_text = unit.name.replace("_", " ")
+            results[unit.name] = intent_text
         return results
 
 
@@ -120,6 +419,7 @@ class CodeEncoder:
         Used as symbolic representation before embedding.
         """
         import re
+        function_source = mask_comments_and_strings(function_source)
         found_patterns = {}
 
         # Split: full function (for safety checks) vs body (for risk patterns)
@@ -130,7 +430,9 @@ class CodeEncoder:
         has_reentrancy_guard = bool(
             re.search(r'nonReentrant|ReentrancyGuard', function_source, re.IGNORECASE)
         )
-        if re.search(r'require\s*\(\s*!?\s*_locked', body_only):
+        # (?:!\s*)? instead of !?\s*: the same strings, but a long run of blanks
+        # (for example a masked comment) has only one way to be consumed.
+        if re.search(r'require\s*\(\s*(?:!\s*)?_locked', body_only):
             has_reentrancy_guard = True
         if re.search(r'_locked\s*=\s*true', body_only, re.IGNORECASE):
             has_reentrancy_guard = True
@@ -411,24 +713,10 @@ class IntentCodeMismatchDetector:
     # ── Helpers ──────────────────────────────
 
     def _extract_function_body(self, source: str, func_name: str) -> str:
-        """Brace-counting extractor. Returns FULL function (signature + body)."""
-        import re
-        pattern = rf"function\s+{re.escape(func_name)}\s*\("
-        match = re.search(pattern, source)
-        if not match:
-            return ""
-        idx = source.find("{", match.end())
-        if idx < 0:
-            return ""
-        depth = 1
-        i = idx + 1
-        while i < len(source) and depth > 0:
-            if source[i] == "{":
-                depth += 1
-            elif source[i] == "}":
-                depth -= 1
-            i += 1
-        return source[match.start():i]
+        """Return the masked source slice for the first named function body."""
+        masked, _ = _source_index(source)
+        unit = _first_bodies(source).get(func_name)
+        return masked[unit.start:unit.end] if unit else ""
 
     def _patterns_to_text(self, patterns: dict) -> str:
         """Convert code pattern dict to natural language for embedding."""
