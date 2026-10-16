@@ -127,11 +127,12 @@ class FunctionUnit:
     has_body: bool
 
 
-def _extract_named_function_units(masked_source: str) -> tuple[FunctionUnit, ...]:
-    """Extract named function units from source with comments and strings masked."""
+def _extract_function_units_from_masked(masked_source: str) -> tuple[FunctionUnit, ...]:
+    """Extract named and special function units from masked source."""
     import re
 
-    token_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*|[(){};.]" )
+    identifier_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+    token_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*|\S")
     tokens = [(match.group(), match.start(), match.end())
               for match in token_pattern.finditer(masked_source)]
     parentheses = {}
@@ -151,59 +152,84 @@ def _extract_named_function_units(masked_source: str) -> tuple[FunctionUnit, ...
             opening = brace_stack.pop()
             braces[opening] = token_index
 
-    units = []
-    token_index = 0
-    while token_index < len(tokens):
-        if tokens[token_index][0] != "function" or token_index + 2 >= len(tokens):
-            token_index += 1
-            continue
-        name_token = tokens[token_index + 1]
-        opening_token = token_index + 2
-        if (not re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", name_token[0])
-                or tokens[opening_token][0] != "("):
-            token_index += 1
-            continue
-        closing_token = parentheses.get(opening_token)
-        if closing_token is None:
-            token_index += 1
-            continue
-
-        cursor = closing_token + 1
-        terminator = None
+    def find_terminator(parameter_close: int):
+        cursor = parameter_close + 1
         while cursor < len(tokens):
             value = tokens[cursor][0]
             if value == "(":
                 close = parentheses.get(cursor)
                 if close is None:
-                    break
+                    return None
                 cursor = close + 1
                 continue
-            if value == ")" or value == "}":
-                break
+            if value in (")", "}"):
+                return None
             if value in ("{", ";"):
-                terminator = cursor
-                break
+                return cursor
             cursor += 1
+        return None
 
-        if terminator is None:
-            token_index += 1
+    def make_unit(name: str, kind: str, start_index: int, terminator: int):
+        value, body_offset, term_end = tokens[terminator]
+        if value == ";":
+            return FunctionUnit(
+                name=name, kind=kind, start=tokens[start_index][1],
+                body_offset=body_offset, end=term_end, has_body=False,
+            )
+        closing = braces.get(terminator)
+        end_offset = len(masked_source) if closing is None else tokens[closing][2]
+        return FunctionUnit(
+            name=name, kind=kind, start=tokens[start_index][1],
+            body_offset=body_offset, end=end_offset, has_body=True,
+        )
+
+    units = []
+    for token_index, (value, start_offset, _) in enumerate(tokens):
+        if value == "function":
+            if token_index + 2 < len(tokens):
+                name_token = tokens[token_index + 1]
+                opening = token_index + 2
+                if (identifier_pattern.fullmatch(name_token[0])
+                        and tokens[opening][0] == "("):
+                    parameter_close = parentheses.get(opening)
+                    if parameter_close is not None:
+                        terminator = find_terminator(parameter_close)
+                        if terminator is not None:
+                            units.append(make_unit(name_token[0], "function", token_index, terminator))
+                    continue
+
+            if token_index + 1 < len(tokens) and tokens[token_index + 1][0] == "(":
+                previous_character = tokens[token_index - 1][0][-1] if token_index else ""
+                if previous_character in ("{", "}", ";", ""):
+                    opening = token_index + 1
+                    parameter_close = parentheses.get(opening)
+                    if parameter_close is not None:
+                        terminator = find_terminator(parameter_close)
+                        if (terminator is not None and tokens[terminator][0] == "{"):
+                            units.append(make_unit("fallback", "fallback", token_index, terminator))
             continue
 
-        term_value, term_start, term_end = tokens[terminator]
-        if term_value == ";":
-            units.append(FunctionUnit(
-                name=name_token[0], kind="function", start=tokens[token_index][1],
-                body_offset=term_start, end=term_end, has_body=False,
-            ))
-        else:
-            closing_brace = braces.get(terminator)
-            end = len(masked_source) if closing_brace is None else tokens[closing_brace][2]
-            units.append(FunctionUnit(
-                name=name_token[0], kind="function", start=tokens[token_index][1],
-                body_offset=term_start, end=end, has_body=True,
-            ))
-        token_index += 1
+        if value not in ("receive", "fallback"):
+            continue
+        if token_index:
+            previous = tokens[token_index - 1][0]
+            if previous == "." or identifier_pattern.fullmatch(previous):
+                continue
+        if token_index + 1 >= len(tokens) or tokens[token_index + 1][0] != "(":
+            continue
+        opening = token_index + 1
+        parameter_close = parentheses.get(opening)
+        if parameter_close is None:
+            continue
+        terminator = find_terminator(parameter_close)
+        if terminator is None or tokens[terminator][0] != "{":
+            continue
+        header = masked_source[tokens[parameter_close][2]:tokens[terminator][1]]
+        if not re.search(r"\bexternal\b", header):
+            continue
+        units.append(make_unit(value, value, token_index, terminator))
 
+    units.sort(key=lambda unit: unit.start)
     return tuple(units)
 
 
@@ -211,7 +237,7 @@ def _extract_named_function_units(masked_source: str) -> tuple[FunctionUnit, ...
 def _source_index(source: str) -> tuple[str, tuple[FunctionUnit, ...]]:
     """Cache the masked source and its parsed function units for one input."""
     masked = mask_comments_and_strings(source)
-    return masked, _extract_named_function_units(masked)
+    return masked, _extract_function_units_from_masked(masked)
 
 
 def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:

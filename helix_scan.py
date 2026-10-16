@@ -12,7 +12,7 @@ Usage:
 Exit codes:
     0 = LOW or MEDIUM (safe to proceed)
     1 = HIGH or CRITICAL (action required)
-    2 = Runtime error / argument error / file error
+    2 = Runtime error / argument error / file error / no analysable functions
 """
 
 import sys
@@ -49,7 +49,7 @@ Options:
 Exit codes:
     0   LOW or MEDIUM — safe to proceed
     1   HIGH or CRITICAL — manual review required
-    2   Runtime error (bad arguments, file not found, etc.)
+    2   Runtime error, bad arguments, file error, or no analysable functions
 
 Examples:
     helix scan VulnerableVault.sol
@@ -215,6 +215,14 @@ def main():
 
     # Validate the detector output contract before the report / JSON is printed.
     _validate_result(result)
+    # No analysed function means nothing was scanned, whatever the message
+    # text says: never report that as a LOW / safe verdict.
+    if not result.get("functions"):
+        print(
+            "[ERROR] No analysable functions were found; nothing was scanned.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     # Output
     if json_mode:
