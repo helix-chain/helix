@@ -22,7 +22,6 @@ use crate::hook::RiskLevel;
 #[derive(Debug, Clone, Deserialize)]
 pub struct FunctionFinding {
     pub name: String,
-    #[serde(default)]
     pub mismatch_score: f64,
     #[serde(default)]
     pub attack_class: Option<String>,
@@ -37,19 +36,65 @@ pub struct DetectorReport {
     pub overall_mismatch_score: f64,
     #[serde(default)]
     pub recommended_action: String,
-    #[serde(default)]
     pub functions: Vec<FunctionFinding>,
 }
 
 impl DetectorReport {
     /// Map the detector's textual risk level onto the shared [`RiskLevel`] grade.
-    pub fn risk(&self) -> RiskLevel {
+    pub fn risk(&self) -> Option<RiskLevel> {
         match self.risk_level.to_ascii_uppercase().as_str() {
-            "CRITICAL" => RiskLevel::Critical,
-            "HIGH" => RiskLevel::High,
-            "MEDIUM" => RiskLevel::Medium,
-            _ => RiskLevel::Low,
+            "CRITICAL" => Some(RiskLevel::Critical),
+            "HIGH" => Some(RiskLevel::High),
+            "MEDIUM" => Some(RiskLevel::Medium),
+            "LOW" => Some(RiskLevel::Low),
+            _ => None,
         }
+    }
+}
+
+/// Decode and validate one detector report without performing network I/O.
+pub fn parse_report(body: &str) -> Result<DetectorReport, String> {
+    let report: DetectorReport = serde_json::from_str(body).map_err(|error| {
+        let message = error.to_string();
+        if message.starts_with("missing field") || message.contains("number out of range") {
+            format!("schema drift: {message}")
+        } else {
+            format!("decode: {message}")
+        }
+    })?;
+
+    if report.risk().is_none() {
+        return Err(format!(
+            "schema drift: unrecognized risk_level {:?}",
+            report.risk_level
+        ));
+    }
+
+    validate_score("overall_mismatch_score", report.overall_mismatch_score)?;
+    for finding in &report.functions {
+        validate_score("function mismatch_score", finding.mismatch_score)?;
+    }
+
+    Ok(report)
+}
+
+fn validate_score(name: &str, score: f64) -> Result<(), String> {
+    if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+        return Err(format!(
+            "schema drift: {name} must be finite and in 0.0..=1.0, got {score}"
+        ));
+    }
+    Ok(())
+}
+
+fn outcome_from_response(status: reqwest::StatusCode, body: &str) -> DetectorOutcome {
+    if !status.is_success() {
+        return DetectorOutcome::Unavailable(format!("http status {}", status.as_u16()));
+    }
+
+    match parse_report(body) {
+        Ok(report) => DetectorOutcome::Scanned(report),
+        Err(message) => DetectorOutcome::Unavailable(message),
     }
 }
 
@@ -92,10 +137,17 @@ impl DetectorClient {
             .send()
             .await;
         match sent {
-            Ok(resp) => match resp.json::<DetectorReport>().await {
-                Ok(report) => DetectorOutcome::Scanned(report),
-                Err(e) => DetectorOutcome::Unavailable(format!("decode: {e}")),
-            },
+            Ok(resp) => {
+                let status = resp.status();
+                if !status.is_success() {
+                    outcome_from_response(status, "")
+                } else {
+                    match resp.text().await {
+                        Ok(body) => outcome_from_response(status, &body),
+                        Err(e) => DetectorOutcome::Unavailable(format!("decode: {e}")),
+                    }
+                }
+            }
             Err(e) => DetectorOutcome::Unavailable(format!("transport: {e}")),
         }
     }
@@ -105,6 +157,20 @@ impl DetectorClient {
 mod tests {
     use super::*;
 
+    fn valid_report_json(risk_level: &str) -> String {
+        format!(
+            r#"{{"contract_address":"0xabc","risk_level":"{risk_level}","overall_mismatch_score":0.95,"recommended_action":"review","functions":[{{"name":"withdraw","intent":"withdraw funds","code_behavior":"external call","mismatch_score":0.95,"attack_class":"reentrancy","evidence":"external call before state update","extra":1}}],"extra_top":true}}"#
+        )
+    }
+
+    fn assert_schema_drift(body: &str) {
+        let error = parse_report(body).expect_err("drifted report must be rejected");
+        assert!(
+            error.starts_with("schema drift:"),
+            "expected schema drift reason, got {error:?}"
+        );
+    }
+
     #[test]
     fn report_maps_textual_risk_levels() {
         let mut r = DetectorReport {
@@ -113,26 +179,197 @@ mod tests {
             recommended_action: String::new(),
             functions: vec![],
         };
-        assert_eq!(r.risk(), RiskLevel::Critical);
+        assert_eq!(r.risk(), Some(RiskLevel::Critical));
         r.risk_level = "HIGH".into();
-        assert_eq!(r.risk(), RiskLevel::High);
+        assert_eq!(r.risk(), Some(RiskLevel::High));
+        r.risk_level = "LOW".into();
+        assert_eq!(r.risk(), Some(RiskLevel::Low));
         r.risk_level = "anything-else".into();
-        assert_eq!(r.risk(), RiskLevel::Low);
+        assert_eq!(r.risk(), None);
     }
 
     #[test]
-    fn deserializes_report_ignoring_unknown_fields() {
-        let json = r#"{
-            "contract_address": "0xabc",
-            "risk_level": "MEDIUM",
-            "overall_mismatch_score": 0.31,
-            "recommended_action": "review",
-            "functions": [{ "name": "withdraw", "mismatch_score": 0.42, "extra": 1 }]
-        }"#;
-        let report: DetectorReport = serde_json::from_str(json).expect("decodes");
-        assert_eq!(report.risk(), RiskLevel::Medium);
+    fn parse_report_accepts_valid_case_insensitive_risk_and_extra_fields() {
+        let json = valid_report_json("critical");
+        let report = parse_report(&json).expect("valid report decodes");
+        assert_eq!(report.risk(), Some(RiskLevel::Critical));
         assert_eq!(report.functions.len(), 1);
         assert_eq!(report.functions[0].name, "withdraw");
+    }
+
+    #[test]
+    fn parse_report_rejects_unknown_risk_labels() {
+        for label in ["EXTREME", "anything-else"] {
+            assert_schema_drift(&valid_report_json(label));
+        }
+    }
+
+    #[test]
+    fn parse_report_rejects_missing_required_function_score() {
+        assert_schema_drift(
+            r#"{"risk_level":"CRITICAL","overall_mismatch_score":0.95,"functions":[{"name":"withdraw"}]}"#,
+        );
+    }
+
+    #[test]
+    fn parse_report_rejects_renamed_overall_score_key() {
+        assert_schema_drift(r#"{"risk_level":"CRITICAL","risk_score":0.95,"functions":[]}"#);
+    }
+
+    #[test]
+    fn parse_report_rejects_missing_required_top_level_fields() {
+        assert_schema_drift(r#"{"risk_level":"LOW","overall_mismatch_score":0.0}"#);
+        assert_schema_drift(r#"{"overall_mismatch_score":0.0,"functions":[]}"#);
+    }
+
+    #[test]
+    fn parse_report_rejects_out_of_range_scores() {
+        for body in [
+            r#"{"risk_level":"HIGH","overall_mismatch_score":1.5,"functions":[]}"#,
+            r#"{"risk_level":"HIGH","overall_mismatch_score":-0.1,"functions":[]}"#,
+            r#"{"risk_level":"HIGH","overall_mismatch_score":0.5,"functions":[{"name":"withdraw","mismatch_score":1.5}]}"#,
+            r#"{"risk_level":"HIGH","overall_mismatch_score":0.5,"functions":[{"name":"withdraw","mismatch_score":-0.1}]}"#,
+            r#"{"risk_level":"HIGH","overall_mismatch_score":1e400,"functions":[]}"#,
+            r#"{"risk_level":"HIGH","overall_mismatch_score":0.5,"functions":[{"name":"withdraw","mismatch_score":1e400}]}"#,
+        ] {
+            assert_schema_drift(body);
+        }
+    }
+
+    #[test]
+    fn parse_report_rejects_malformed_json_as_decode_error() {
+        let error = parse_report("{not-json").expect_err("malformed JSON must fail");
+        assert!(error.starts_with("decode:"), "got {error:?}");
+    }
+
+    async fn scan_response(status: axum::http::StatusCode, body: String) -> DetectorOutcome {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind loopback listener");
+        let address = listener.local_addr().expect("read listener address");
+        let app = axum::Router::new().route(
+            "/scan",
+            axum::routing::post(move || {
+                let body = body.clone();
+                async move {
+                    axum::response::Response::builder()
+                        .status(status)
+                        .body(axum::body::Body::from(body))
+                        .expect("build loopback response")
+                }
+            }),
+        );
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await
+                .expect("serve loopback scan endpoint");
+        });
+
+        let client = DetectorClient::new(format!("http://{address}"), Duration::from_secs(2));
+        let outcome = client.scan_source("contract C {}").await;
+        let _ = shutdown_tx.send(());
+        server.await.expect("join loopback server");
+        outcome
+    }
+
+    #[test]
+    fn response_outcome_checks_status_before_parsing_body() {
+        let valid = valid_report_json("LOW");
+        let mut failures = Vec::new();
+        for (body_kind, body) in [
+            ("valid report", valid.as_str()),
+            ("error body", "gateway error"),
+        ] {
+            for code in [400, 422, 500, 503] {
+                let status = reqwest::StatusCode::from_u16(code).expect("valid status");
+                match outcome_from_response(status, body) {
+                    DetectorOutcome::Unavailable(reason)
+                        if reason.starts_with("http status")
+                            && reason.contains(&code.to_string()) => {}
+                    outcome => failures.push(format!(
+                        "{body_kind} with status {code} returned {outcome:?}"
+                    )),
+                }
+            }
+        }
+        assert!(failures.is_empty(), "unexpected outcomes: {failures:?}");
+
+        assert!(matches!(
+            outcome_from_response(reqwest::StatusCode::OK, &valid),
+            DetectorOutcome::Scanned(DetectorReport { .. })
+        ));
+        match outcome_from_response(reqwest::StatusCode::NO_CONTENT, "") {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("decode:") || reason.starts_with("schema drift:") => {}
+            outcome => panic!("empty success body must fail report decoding, got {outcome:?}"),
+        }
+        match outcome_from_response(reqwest::StatusCode::FOUND, "") {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("http status") && reason.contains("302") => {}
+            outcome => panic!("redirect status must be unavailable, got {outcome:?}"),
+        }
+    }
+
+    async fn scan_body(body: String) -> DetectorOutcome {
+        scan_response(axum::http::StatusCode::OK, body).await
+    }
+
+    #[tokio::test]
+    async fn scan_source_returns_scanned_for_valid_body_and_unavailable_for_drift() {
+        let valid = valid_report_json("CRITICAL");
+        assert!(matches!(
+            scan_body(valid).await,
+            DetectorOutcome::Scanned(DetectorReport { .. })
+        ));
+
+        let drifted = valid_report_json("EXTREME");
+        match scan_body(drifted).await {
+            DetectorOutcome::Unavailable(reason) => {
+                assert!(reason.contains("schema drift"), "got {reason:?}");
+            }
+            outcome => panic!("drifted report must fail open as unavailable, got {outcome:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn scan_source_rejects_error_statuses_before_parsing_body() {
+        let mut failures = Vec::new();
+        for (body_kind, body) in [
+            ("valid report", valid_report_json("LOW")),
+            ("error body", "gateway error".to_owned()),
+        ] {
+            for code in [400, 422, 500, 503] {
+                let status = axum::http::StatusCode::from_u16(code).expect("valid status");
+                match scan_response(status, body.clone()).await {
+                    DetectorOutcome::Unavailable(reason)
+                        if reason.starts_with("http status")
+                            && reason.contains(&code.to_string()) => {}
+                    outcome => failures.push(format!(
+                        "{body_kind} with status {code} returned {outcome:?}"
+                    )),
+                }
+            }
+        }
+        assert!(failures.is_empty(), "unexpected outcomes: {failures:?}");
+    }
+
+    #[tokio::test]
+    async fn scan_source_handles_empty_success_and_redirect_responses() {
+        match scan_response(axum::http::StatusCode::NO_CONTENT, String::new()).await {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("decode:") || reason.starts_with("schema drift:") => {}
+            outcome => panic!("empty success response must fail report decoding, got {outcome:?}"),
+        }
+
+        match scan_response(axum::http::StatusCode::FOUND, String::new()).await {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("http status") && reason.contains("302") => {}
+            outcome => panic!("redirect response must be unavailable, got {outcome:?}"),
+        }
     }
 
     #[tokio::test]
