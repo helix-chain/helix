@@ -139,5 +139,67 @@ class FunctionBodyBoundaryTests(unittest.TestCase):
         self.assertNotIn("function after", body)
 
 
+class NamedFunctionUnitTests(unittest.TestCase):
+    def _units(self, source):
+        extract = getattr(mismatch_detector, "extract_function_units", None)
+        self.assertTrue(callable(extract), "function unit extractor is missing")
+        return extract(source)
+
+    def test_interface_declarations_are_bodyless_and_have_no_intent(self):
+        source = '''interface IPair {
+            /// @notice Read the reserve values from the pair.
+            function getReserves() external view returns (uint112, uint112);
+        }'''
+        units = self._units(source)
+        reserves = [unit for unit in units if unit.name == "getReserves"]
+        self.assertEqual(len(reserves), 1)
+        self.assertFalse(reserves[0].has_body)
+        self.assertEqual(reserves[0].kind, "function")
+        self.assertNotIn("getReserves", mismatch_detector.IntentExtractor().extract(source))
+        self.assertEqual(
+            mismatch_detector.IntentCodeMismatchDetector()._extract_function_body(source, "getReserves"),
+            "",
+        )
+
+    def test_contract_definition_after_interface_declaration_uses_its_own_body(self):
+        source = '''interface IPair {
+            /// @notice Interface declaration intent.
+            function getReserves() external view returns (uint112, uint112);
+        }
+        contract Pair {
+            /// @notice Read the implemented reserve values.
+            function getReserves() external view returns (uint112, uint112) {
+                return (reserve0, reserve1);
+            }
+            function after() external { reserve0 = 1; }
+        }'''
+        reserves = [unit for unit in self._units(source) if unit.name == "getReserves"]
+        self.assertEqual([unit.has_body for unit in reserves], [False, True])
+        body = mismatch_detector.IntentCodeMismatchDetector()._extract_function_body(source, "getReserves")
+        self.assertIn("return (reserve0, reserve1);", body)
+        self.assertNotIn("function after", body)
+        self.assertEqual(
+            mismatch_detector.IntentExtractor().extract(source)["getReserves"],
+            "@notice Read the implemented reserve values.",
+        )
+
+    def test_abstract_virtual_declaration_is_not_an_implementation(self):
+        source = '''abstract contract Base {
+            /// @notice Update abstract state.
+            function update(uint256 value) public virtual;
+        }
+        contract Derived {
+            function other() external { value = 1; }
+        }'''
+        units = [unit for unit in self._units(source) if unit.name == "update"]
+        self.assertEqual(len(units), 1)
+        self.assertFalse(units[0].has_body)
+        self.assertNotIn("update", mismatch_detector.IntentExtractor().extract(source))
+        self.assertEqual(
+            mismatch_detector.IntentCodeMismatchDetector()._extract_function_body(source, "update"),
+            "",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
