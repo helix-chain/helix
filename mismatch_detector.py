@@ -7,6 +7,7 @@ Tech stack: Python 3.11 + PyTorch 2.3 + sentence-transformers + pgvector
 """
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Optional
 import numpy as np
 
@@ -115,6 +116,109 @@ def mask_comments_and_strings(source: str) -> str:
     return "".join(masked)
 
 
+@dataclass(frozen=True)
+class FunctionUnit:
+    """A named Solidity function definition or declaration span."""
+    name: str
+    kind: str
+    start: int
+    body_offset: int
+    end: int
+    has_body: bool
+
+
+def _extract_named_function_units(masked_source: str) -> tuple[FunctionUnit, ...]:
+    """Extract named function units from source with comments and strings masked."""
+    import re
+
+    token_pattern = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*|[(){};.]" )
+    tokens = [(match.group(), match.start(), match.end())
+              for match in token_pattern.finditer(masked_source)]
+    parentheses = {}
+    braces = {}
+    paren_stack = []
+    brace_stack = []
+
+    for token_index, (value, _, _) in enumerate(tokens):
+        if value == "(":
+            paren_stack.append(token_index)
+        elif value == ")" and paren_stack:
+            opening = paren_stack.pop()
+            parentheses[opening] = token_index
+        elif value == "{":
+            brace_stack.append(token_index)
+        elif value == "}" and brace_stack:
+            opening = brace_stack.pop()
+            braces[opening] = token_index
+
+    units = []
+    token_index = 0
+    while token_index < len(tokens):
+        if tokens[token_index][0] != "function" or token_index + 2 >= len(tokens):
+            token_index += 1
+            continue
+        name_token = tokens[token_index + 1]
+        opening_token = token_index + 2
+        if (not re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", name_token[0])
+                or tokens[opening_token][0] != "("):
+            token_index += 1
+            continue
+        closing_token = parentheses.get(opening_token)
+        if closing_token is None:
+            token_index += 1
+            continue
+
+        cursor = closing_token + 1
+        terminator = None
+        while cursor < len(tokens):
+            value = tokens[cursor][0]
+            if value == "(":
+                close = parentheses.get(cursor)
+                if close is None:
+                    break
+                cursor = close + 1
+                continue
+            if value == ")" or value == "}":
+                break
+            if value in ("{", ";"):
+                terminator = cursor
+                break
+            cursor += 1
+
+        if terminator is None:
+            token_index += 1
+            continue
+
+        term_value, term_start, term_end = tokens[terminator]
+        if term_value == ";":
+            units.append(FunctionUnit(
+                name=name_token[0], kind="function", start=tokens[token_index][1],
+                body_offset=term_start, end=term_end, has_body=False,
+            ))
+        else:
+            closing_brace = braces.get(terminator)
+            end = len(masked_source) if closing_brace is None else tokens[closing_brace][2]
+            units.append(FunctionUnit(
+                name=name_token[0], kind="function", start=tokens[token_index][1],
+                body_offset=term_start, end=end, has_body=True,
+            ))
+        token_index += 1
+
+    return tuple(units)
+
+
+@lru_cache(maxsize=16)
+def _source_index(source: str) -> tuple[str, tuple[FunctionUnit, ...]]:
+    """Cache the masked source and its parsed function units for one input."""
+    masked = mask_comments_and_strings(source)
+    return masked, _extract_named_function_units(masked)
+
+
+def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:
+    """Return named function definitions and declarations in source order."""
+    return _source_index(source)[1]
+
+
 class IntentExtractor:
     """
     Extracts human intent from Solidity NatSpec comments and function names.
@@ -124,22 +228,25 @@ class IntentExtractor:
     def extract(self, source_code: str) -> dict[str, str]:
         import re
         results = {}
-        # Match function with ALL preceding comment lines
-        func_pattern = r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*function\s+(\w+)\s*\("
-        for match in re.finditer(func_pattern, source_code):
-            comment_block = match.group(1)
-            func_name = match.group(2)
-            # Extract meaningful text from NatSpec
+        comment_pattern = re.compile(
+            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*$"
+        )
+        _, units = _source_index(source_code)
+        for unit in units:
+            if not unit.has_body:
+                continue
+            prefix = source_code[:unit.start]
+            comment_match = comment_pattern.search(prefix)
+            comment_block = comment_match.group(1) if comment_match else ""
             parts = re.findall(r"@notice\s+(.+)|@dev\s+(.+)|///\s*(.+)", comment_block)
             intent_parts = [p[0] or p[1] or p[2] for p in parts if any(p)]
             intent_text = " ".join(intent_parts).strip()
             if not intent_text and comment_block:
-                # Strip comment markers and get raw text
                 raw = re.sub(r"[/*@]|\bparam\b|\breturns\b", " ", comment_block)
                 intent_text = " ".join(raw.split())[:200]
             if not intent_text:
-                intent_text = func_name.replace("_", " ")
-            results[func_name] = intent_text
+                intent_text = unit.name.replace("_", " ")
+            results[unit.name] = intent_text
         return results
 
 
@@ -477,24 +584,11 @@ class IntentCodeMismatchDetector:
 
     def _extract_function_body(self, source: str, func_name: str) -> str:
         """Return the masked source slice for the first named function body."""
-        import re
-        masked = mask_comments_and_strings(source)
-        pattern = rf"function\s+{re.escape(func_name)}\s*\("
-        match = re.search(pattern, masked)
-        if not match:
-            return ""
-        idx = masked.find("{", match.end())
-        if idx < 0:
-            return ""
-        depth = 1
-        i = idx + 1
-        while i < len(masked) and depth > 0:
-            if masked[i] == "{":
-                depth += 1
-            elif masked[i] == "}":
-                depth -= 1
-            i += 1
-        return masked[match.start():i]
+        masked, units = _source_index(source)
+        for unit in units:
+            if unit.name == func_name and unit.has_body:
+                return masked[unit.start:unit.end]
+        return ""
 
     def _patterns_to_text(self, patterns: dict) -> str:
         """Convert code pattern dict to natural language for embedding."""
