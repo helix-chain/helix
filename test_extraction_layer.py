@@ -35,6 +35,18 @@ class CommentAndStringMaskTests(unittest.TestCase):
         block_end = source.index('*/', block_comment) + 2
         self.assertTrue(all(char == " " for char in masked[block_comment:block_end]))
 
+    def test_escaped_quotes_do_not_end_a_string(self):
+        mask = mismatch_detector.mask_comments_and_strings
+        source = r'''label = "say \"hi\" // not a comment"; owner = msg.sender; note = 'it\'s // still text'; x = 1;'''
+        masked = mask(source)
+        self.assertEqual(len(masked), len(source))
+        self.assertIn("owner = msg.sender;", masked)
+        self.assertIn("x = 1;", masked)
+        self.assertNotIn("not a comment", masked)
+        self.assertNotIn("still text", masked)
+        self.assertNotIn("hi", masked)
+        self.assertEqual(mask(masked), masked)
+
     def test_mask_handles_continuations_and_unterminated_literals(self):
         mask = getattr(mismatch_detector, "mask_comments_and_strings", None)
         self.assertTrue(callable(mask), "source masking helper is missing")
@@ -203,6 +215,25 @@ class NamedFunctionUnitTests(unittest.TestCase):
             "@notice Read the implemented reserve values.",
         )
 
+    def test_same_name_definitions_use_the_first_body_and_the_last_intent(self):
+        """Current policy, unchanged from earlier versions: one report per name,
+        built from the first body and the last definition's comment. Overloads
+        and overrides are therefore not analysed separately; pinned so that any
+        change to this policy is deliberate."""
+        source = '''contract A {
+            /// @notice First withdraw.
+            function withdraw(uint256 amount) external { balances[msg.sender] -= amount; }
+            /// @notice Second withdraw.
+            function withdraw() external { total = 0; }
+        }'''
+        body = mismatch_detector.IntentCodeMismatchDetector()._extract_function_body(source, "withdraw")
+        self.assertIn("balances[msg.sender] -= amount", body)
+        self.assertNotIn("total = 0", body)
+        self.assertEqual(
+            mismatch_detector.IntentExtractor().extract(source)["withdraw"],
+            "@notice Second withdraw.",
+        )
+
     def test_abstract_virtual_declaration_is_not_an_implementation(self):
         source = '''abstract contract Base {
             /// @notice Update abstract state.
@@ -272,7 +303,7 @@ class SpecialFunctionTests(unittest.TestCase):
         from pathlib import Path
 
         repo=Path(__file__).resolve().parent
-        with tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             source_path=Path(temp_dir) / "empty.sol"
             source_path.write_text("contract Empty {}", encoding="utf-8")
             proc=subprocess.run(
@@ -406,6 +437,15 @@ class IntentExtractionTests(unittest.TestCase):
         )
         intent = mismatch_detector.IntentExtractor().extract(source)["withdraw"]
         self.assertIn("Safely withdraw funds", intent)
+
+    def test_undocumented_function_intent_is_its_name(self):
+        source = '''contract Plain {
+            function _withdraw_all() external { total = 0; }
+            function getPrice() external view returns (uint256) { return price; }
+        }'''
+        intents = mismatch_detector.IntentExtractor().extract(source)
+        self.assertEqual(intents["_withdraw_all"], " withdraw all")
+        self.assertEqual(intents["getPrice"], "getPrice")
 
     def test_comment_like_text_inside_a_string_does_not_become_intent(self):
         source = '''contract Labels {

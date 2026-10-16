@@ -285,6 +285,25 @@ class TestCliExitContract(unittest.TestCase):
                     self.assertEqual(out, "" if json_mode else expected_human_out)
                     self.assertIn("[ERROR]", err)
 
+    def test_missing_function_list_or_empty_high_result_exits_2(self):
+        """No analysed function is never a verdict: a result without the
+        'functions' key, or with an empty list next to a HIGH / CRITICAL level,
+        exits 2 like the empty LOW result."""
+        no_key = _valid_result("LOW")
+        del no_key["functions"]
+        cases = (
+            ("functions key missing", no_key),
+            ("empty list, HIGH", _valid_result("HIGH", functions=[])),
+            ("empty list, CRITICAL", _valid_result("CRITICAL", functions=[])),
+        )
+        for label, result in cases:
+            for json_mode in (True, False):
+                with self.subTest(case=label, json=json_mode):
+                    code, out, err = self._run_cli(result, json_mode=json_mode)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(out, "" if json_mode else "  Scanning: %s\n" % self._sol_path)
+                    self.assertIn("[ERROR]", err)
+
     def test_invalid_value_json_exits_2(self):
         """Legacy name kept: --json, unknown risk_level -> exit 2, stdout empty."""
         code, out, err = self._run_cli(_valid_result("UNKNOWN"), json_mode=True)

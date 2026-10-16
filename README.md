@@ -69,7 +69,7 @@ helix scan contract.sol --address 0x1234...
 helix scan contract.sol --json
 ```
 
-Exit codes: `0` = LOW/MEDIUM (safe), `1` = HIGH/CRITICAL (action required), `2` = error.
+Exit codes: `0` = LOW/MEDIUM (safe), `1` = HIGH/CRITICAL (action required), `2` = error, or no function could be analysed (nothing was scanned, so no verdict).
 
 ### Demo Output
 
