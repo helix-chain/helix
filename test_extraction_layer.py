@@ -378,5 +378,30 @@ class MissingAccessControlTests(unittest.TestCase):
         self.assertEqual(list(self.encoder.summarize(source)), expected)
 
 
+class IntentExtractionTests(unittest.TestCase):
+    def test_intent_extraction_time_grows_linearly_with_function_count(self):
+        import time
+
+        lines = ["contract Many {"]
+        for index in range(2000):
+            lines.append(f"    /// @notice Update slot {index}")
+            lines.append(f"    function update{index}(uint256 value) external {{ slots[{index}] = value; }}")
+        lines.append("}")
+        source = "\n".join(lines)
+        started = time.perf_counter()
+        intents = mismatch_detector.IntentExtractor().extract(source)
+        elapsed = time.perf_counter() - started
+        self.assertEqual(len(intents), 2000)
+        self.assertEqual(intents["update1999"], "@notice Update slot 1999")
+        self.assertLess(elapsed, 5.0, f"extracting 2000 documented functions took {elapsed:.1f}s")
+
+    def test_comment_like_text_inside_a_string_does_not_become_intent(self):
+        source = '''contract Labels {
+            string public label = "x /// not documentation";
+            function update(uint256 value) external { slot = value; }
+        }'''
+        self.assertEqual(mismatch_detector.IntentExtractor().extract(source)["update"], "update")
+
+
 if __name__ == "__main__":
     unittest.main()
