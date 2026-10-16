@@ -283,7 +283,72 @@ def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:
     return _source_index(source)[1]
 
 
-_MAX_DOC_LINES = 200
+def _doc_comment_block(gap: str) -> str:
+    """Return the documentation comments that end right before a definition.
+
+    gap is the text between the preceding code and the definition, so it holds
+    only comments and whitespace. The result is the text that the earlier
+    regular expression captured with re.search:
+
+        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\r?\\n)*)[ \\t]*$
+
+    i.e. the run of items starting at the leftmost position from which the rest
+    of the gap splits into items (a /// line, or anything from /* to a */ that
+    is followed by blanks and a line break) and trailing blanks. The regex can
+    backtrack exponentially when the split fails; here every position is
+    decided once, from the end, so the work is linear in the gap length.
+    """
+    length = len(gap)
+    # Where the run of items must end: before the trailing blanks, or, because
+    # $ also matches just before a final line feed, before a blank last line.
+    boundary = length
+    if gap.endswith("\n"):
+        last_line = gap.rfind("\n", 0, length - 1) + 1
+        if gap[last_line:length - 1].strip(" \t") == "":
+            boundary = last_line
+    else:
+        while boundary > 0 and gap[boundary - 1] in " \t":
+            boundary -= 1
+    if boundary == 0 or gap[boundary - 1] != "\n":
+        return ""
+
+    # splits_from[i]: gap[i:] is a sequence of items followed by trailing blanks.
+    splits_from = [False] * (length + 3)
+    for index in range(boundary, length + 1):
+        splits_from[index] = True
+    # block_end_from[i]: some "*/ blanks [CR] LF" whose "*/" starts at >= i ends
+    # exactly where the rest of the gap splits.
+    block_end_from = [False] * (length + 3)
+    next_line_feed = [length] * (length + 1)
+    after_blanks = list(range(length + 1))
+    line_feed = length
+    for index in range(length - 1, -1, -1):
+        if gap[index] == "\n":
+            line_feed = index
+        next_line_feed[index] = line_feed
+        if gap[index] in " \t":
+            after_blanks[index] = after_blanks[index + 1]
+
+    for index in range(boundary - 1, -1, -1):
+        ends_here = False
+        if gap.startswith("*/", index):
+            cursor = after_blanks[index + 2]
+            if cursor < length and gap[cursor] == "\r":
+                cursor += 1
+            ends_here = cursor < length and gap[cursor] == "\n" and splits_from[cursor + 1]
+        block_end_from[index] = ends_here or block_end_from[index + 1]
+
+        start = after_blanks[index]
+        if gap.startswith("///", start):
+            line_end = next_line_feed[start]
+            if line_end < length and splits_from[line_end + 1]:
+                splits_from[index] = True
+                continue
+        if gap.startswith("/*", start) and block_end_from[start + 2]:
+            splits_from[index] = True
+
+    first = next(index for index in range(length + 1) if splits_from[index])
+    return gap[first:boundary] if first < boundary else ""
 
 
 class IntentExtractor:
@@ -295,31 +360,17 @@ class IntentExtractor:
     def extract(self, source_code: str) -> dict[str, str]:
         import re
         results = {}
-        # A block comment is matched as one unit (it cannot run past its own
-        # closing marker), so a run of comments has a single parse and a failed
-        # match cannot backtrack exponentially.
-        comment_pattern = re.compile(
-            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*(?:[^*]|\*(?!/))*\*/[ \t]*\r?\n)*)[ \t]*$"
-        )
         masked, units = _source_index(source_code)
         for unit in units:
             if not unit.has_body:
                 continue
             # Only the comments and whitespace between the preceding code and
-            # this definition can document it. Searching that gap (at most its
-            # last _MAX_DOC_LINES lines) instead of the whole prefix keeps
-            # extraction linear and keeps string contents out.
+            # this definition can document it. Reading that gap (instead of the
+            # whole prefix) keeps extraction linear and keeps string contents out.
             gap_start = unit.start
-            lines_seen = 0
             while gap_start > 0 and masked[gap_start - 1].isspace():
-                if masked[gap_start - 1] == "\n":
-                    lines_seen += 1
-                    if lines_seen > _MAX_DOC_LINES:
-                        break
                 gap_start -= 1
-            prefix = source_code[gap_start:unit.start]
-            comment_match = comment_pattern.search(prefix)
-            comment_block = comment_match.group(1) if comment_match else ""
+            comment_block = _doc_comment_block(source_code[gap_start:unit.start])
             parts = re.findall(r"@notice\s+(.+)|@dev\s+(.+)|///\s*(.+)", comment_block)
             intent_parts = [p[0] or p[1] or p[2] for p in parts if any(p)]
             intent_text = " ".join(intent_parts).strip()

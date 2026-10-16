@@ -413,6 +413,49 @@ class IntentExtractionTests(unittest.TestCase):
             f"1000 lookups {small_time:.4f}s, 4000 lookups {large_time:.4f}s",
         )
 
+    def test_doc_comment_block_matches_the_reference_expression(self):
+        """The linear scan returns what the earlier regular expression captured
+        (re.search on the gap), checked on deterministic random comment gaps
+        that are small enough for the expression itself to stay fast."""
+        import random
+        import re
+
+        reference = re.compile(
+            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\r?\n)*)[ \t]*$"
+        )
+        pieces = [
+            "/// note\n", "    /// @notice Safe\n", "/* block */\n", "  /** @dev doc */\n",
+            "/* a */ /* b */\n", "// plain\n", "\n", "    ", "\t", "/* multi\n line */\n",
+            "/// with /* inside\n", "/* end */\r\n", "//// four\n", "/* x */ // y\n",
+            "/* no newline */", " ",
+        ]
+        rng = random.Random(7)
+        for _ in range(3000):
+            gap = "\n" + "".join(rng.choice(pieces) for _ in range(rng.randint(0, 6)))
+            gap += " " * rng.randint(0, 4)
+            match = reference.search(gap)
+            expected = match.group(1) if match else ""
+            self.assertEqual(mismatch_detector._doc_comment_block(gap), expected, repr(gap))
+
+    def test_comment_run_time_grows_linearly_with_its_length(self):
+        extract = mismatch_detector.IntentExtractor().extract
+
+        def build(lines_per_gap):
+            rows = ["contract Notes {"]
+            for index in range(20):
+                rows.extend(f"    /* retired helper {index}.{line} */" for line in range(lines_per_gap))
+                rows.append("    // lint-disable-next-line")
+                rows.append(f"    function update{index}(uint256 value) external {{ slot = value; }}")
+            rows.append("}")
+            return "\n".join(rows)
+
+        times = {lines: _best_time(extract, build(lines)) for lines in (20, 40, 80)}
+        # Four times the comment lines: about 4x when linear, 16x when quadratic.
+        self.assertLess(
+            times[80], 8 * times[20] + 0.01,
+            "comment lines 20/40/80: " + ", ".join(f"{times[k]:.4f}s" for k in (20, 40, 80)),
+        )
+
     def test_many_comment_lines_before_a_function_stay_fast(self):
         import time
 
