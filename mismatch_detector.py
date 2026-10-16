@@ -51,6 +51,70 @@ class FunctionMismatch:
 # 2. Intent Extractor
 # ─────────────────────────────────────────────
 
+def mask_comments_and_strings(source: str) -> str:
+    """Blank comments and string contents without changing source offsets."""
+    masked = list(source)
+    length = len(source)
+    index = 0
+
+    def blank(position: int) -> None:
+        if source[position] not in "\r\n":
+            masked[position] = " "
+
+    while index < length:
+        if source.startswith("//", index):
+            end = index
+            while end < length and source[end] not in "\r\n":
+                end += 1
+            for position in range(index, end):
+                blank(position)
+            index = end
+            continue
+
+        if source.startswith("/*", index):
+            end = source.find("*/", index + 2)
+            stop = length if end < 0 else end + 2
+            for position in range(index, stop):
+                blank(position)
+            index = stop
+            continue
+
+        quote = source[index]
+        if quote not in "\"'":
+            index += 1
+            continue
+
+        index += 1
+        while index < length:
+            char = source[index]
+            if char == "\\":
+                blank(index)
+                if index + 1 >= length:
+                    index += 1
+                    break
+                if source[index + 1] == "\r":
+                    if index + 2 < length and source[index + 2] == "\n":
+                        index += 3
+                    else:
+                        index += 2
+                    continue
+                if source[index + 1] == "\n":
+                    index += 2
+                    continue
+                blank(index + 1)
+                index += 2
+                continue
+            if char == quote:
+                index += 1
+                break
+            if char in "\r\n":
+                break
+            blank(index)
+            index += 1
+
+    return "".join(masked)
+
+
 class IntentExtractor:
     """
     Extracts human intent from Solidity NatSpec comments and function names.
@@ -120,6 +184,7 @@ class CodeEncoder:
         Used as symbolic representation before embedding.
         """
         import re
+        function_source = mask_comments_and_strings(function_source)
         found_patterns = {}
 
         # Split: full function (for safety checks) vs body (for risk patterns)
