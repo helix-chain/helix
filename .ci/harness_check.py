@@ -18,9 +18,11 @@ Module ③「确定性验证拦截网」的可移植核心（_LESSONS §二十�
 """
 import argparse, fnmatch, os, re, subprocess, sys
 
-SELF_FILES = {'harness_rules.yaml', 'project_rules.example.yaml', 'harness_check.py',
-              'README.md', 'ci-harness.snippet.yml', 'pre-commit.hook.ps1'}
 MAX_BYTES = 2_000_000
+
+
+class GitError(RuntimeError):
+    """A Git command failed, could not start, or timed out."""
 
 # 轻量 secret 正则（FALLBACK ONLY — 非 gitleaks 替代）
 SECRET_RX = [
@@ -67,21 +69,55 @@ def _load_rules(path):
     return rules
 
 
-def _git(repo, *a):
+def _git(repo, *a, allow_returncodes=()):
     try:
         r = subprocess.run(['git', '-C', repo, *a], capture_output=True, text=True,
                            encoding='utf-8', errors='replace', timeout=60)
-        out = r.stdout or ''
-        if r.returncode and r.stderr and not out:
-            out = r.stderr
-        return out
-    except Exception as e:
-        return f'(git 错误: {e})'
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise GitError(f'{e}') from e
+    allowed = {0, *allow_returncodes}
+    if r.returncode not in allowed:
+        detail = (r.stderr or '').strip() or (r.stdout or '').strip()
+        if not detail:
+            detail = f'exit code {r.returncode}'
+        raise GitError(detail)
+    return r
 
 
-def cmd_staged(repo, rules):
+def _is_exempt_file(repo, file_path, rules_path):
+    """Match only the in-repo rules file and this checker by normalized path."""
+    repo_abs = os.path.abspath(os.path.normpath(repo))
+
+    def normalized_rel(path, relative_to_repo=False):
+        raw = os.fspath(path).replace('\\', os.sep).replace('/', os.sep)
+        if not os.path.isabs(raw):
+            base = repo_abs if relative_to_repo else os.getcwd()
+            raw = os.path.join(base, raw)
+        absolute = os.path.abspath(os.path.normpath(raw))
+        rel = os.path.relpath(absolute, repo_abs)
+        return os.path.normcase(os.path.normpath(rel)).replace('\\', '/')
+
+    def inside_repo(rel):
+        return rel != '..' and not rel.startswith('../') and not os.path.isabs(rel)
+
+    target = normalized_rel(file_path, relative_to_repo=True)
+    allowed = set()
+    for candidate in (rules_path, __file__):
+        if candidate:
+            try:
+                rel = normalized_rel(candidate)
+            except ValueError:
+                # Windows cannot compute a relative path across drive letters;
+                # that candidate is outside this repo and is not exempt.
+                continue
+            if inside_repo(rel):
+                allowed.add(rel)
+    return inside_repo(target) and target in allowed
+
+
+def cmd_staged(repo, rules, rules_path=None):
     fails = []
-    files = [l for l in _git(repo, 'diff', '--cached', '--name-only').splitlines() if l.strip()]
+    files = [l for l in _git(repo, 'diff', '--cached', '--name-only').stdout.splitlines() if l.strip()]
     names = rules.get('forbidden_staged_names', [])
     forb = rules.get('forbidden_patterns', [])
     for f in files:
@@ -89,9 +125,9 @@ def cmd_staged(repo, rules):
         for pat in names:
             if fnmatch.fnmatch(base, pat) or fnmatch.fnmatch(f, pat):
                 fails.append(f'禁用文件被暂存: {f} (匹配 {pat})')
-        if base in SELF_FILES:
+        if _is_exempt_file(repo, f, rules_path):
             continue
-        diff = _git(repo, 'diff', '--cached', '-U0', '--', f)
+        diff = _git(repo, 'diff', '--cached', '-U0', '--', f).stdout
         added = '\n'.join(l[1:] for l in diff.splitlines()
                           if l.startswith('+') and not l.startswith('+++'))
         for pat in forb:
@@ -111,7 +147,8 @@ def cmd_ignore(repo, rules):
     fails = []
     public = bool(rules.get('is_public_repo', False))
     for p in rules.get('sensitive_paths', []):
-        ignored = bool(_git(repo, 'check-ignore', '-v', p).strip())
+        result = _git(repo, 'check-ignore', '-q', '--', p, allow_returncodes={1})
+        ignored = result.returncode == 0
         if not ignored:
             if public:
                 fails.append(f'敏感路径未被 .gitignore 命中: {p} （公开仓 → git add . 会暂存 → 泄密）')
@@ -120,27 +157,33 @@ def cmd_ignore(repo, rules):
     return fails
 
 
-def cmd_grep(repo, rules):
+def cmd_grep(repo, rules, rules_path=None):
     fails = []
     forb = rules.get('forbidden_patterns', [])
-    if forb:
-        tracked = [l for l in _git(repo, 'ls-files').splitlines() if l.strip()]
-        for f in tracked:
-            if os.path.basename(f) in SELF_FILES:
+    tracked = [l for l in _git(repo, 'ls-files').stdout.splitlines() if l.strip()]
+    for f in tracked:
+        if _is_exempt_file(repo, f, rules_path):
+            continue
+        full = os.path.join(repo, f)
+        try:
+            if os.stat(full).st_size > MAX_BYTES:
                 continue
-            full = os.path.join(repo, f)
-            if not os.path.isfile(full) or os.path.getsize(full) > MAX_BYTES:
-                continue
+            with open(full, encoding='utf-8', errors='replace') as fobj:
+                content = fobj.read()
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError) as e:
+            fails.append(f'{f}: 无法读取跟踪文件: {e}')
+            continue
+        for pat in forb:
             try:
-                content = open(full, encoding='utf-8', errors='replace').read()
-            except OSError:
-                continue
-            for pat in forb:
-                try:
-                    if re.search(pat, content):
-                        fails.append(f'{f}: 含 forbidden_pattern /{pat}/')
-                except re.error:
-                    pass
+                if re.search(pat, content):
+                    fails.append(f'{f}: 含 forbidden_pattern /{pat}/')
+            except re.error:
+                pass
+        for rx, label in SECRET_RX:
+            if rx.search(content):
+                fails.append(f'{f}: 疑似 secret（兜底正则·非 gitleaks）: {label}')
     for spec in rules.get('required_patterns', []):
         if '::' not in spec:
             continue
@@ -149,7 +192,8 @@ def cmd_grep(repo, rules):
         ok = False
         if os.path.isfile(full):
             try:
-                ok = bool(re.search(pat, open(full, encoding='utf-8', errors='replace').read()))
+                with open(full, encoding='utf-8', errors='replace') as fobj:
+                    ok = bool(re.search(pat, fobj.read()))
             except (OSError, re.error):
                 ok = False
         if not ok:
@@ -164,14 +208,34 @@ def main():
     ap.add_argument('--rules', default=None, help='规则文件；默认 <repo>/harness_rules.yaml')
     args = ap.parse_args()
     repo = os.path.abspath(args.repo)
-    rules_path = args.rules or os.path.join(repo, 'harness_rules.yaml')
-    rules = _load_rules(rules_path)
-    if not rules:
-        print(f'[harness] 无规则文件（{rules_path}）→ 跳过 (exit 0)。见 project_rules.example.yaml')
-        return 0
+    explicit_rules = args.rules is not None
+    rules_path = args.rules if explicit_rules else os.path.join(repo, 'harness_rules.yaml')
+    if not os.path.isfile(rules_path):
+        if not explicit_rules:
+            print(f'[harness] 无规则文件（{rules_path}）→ 跳过 (exit 0)。见 project_rules.example.yaml')
+            return 0
+        print(f'[FAIL:rules] rules file not found: {rules_path}')
+        return 1
+    try:
+        rules = _load_rules(rules_path)
+    except Exception as e:
+        print(f'[FAIL:rules] rules file could not be loaded: {e}')
+        return 1
+    if not isinstance(rules, dict) or not rules:
+        print(f'[FAIL:rules] rules file is empty or invalid: {rules_path}')
+        return 1
     funcs = {'staged': cmd_staged, 'ignore': cmd_ignore, 'grep': cmd_grep}
     stages = ['staged', 'ignore', 'grep'] if args.cmd == 'all' else [args.cmd]
-    fails = [(s, m) for s in stages for m in funcs[s](repo, rules)]
+    fails = []
+    for stage in stages:
+        try:
+            if stage in ('staged', 'grep'):
+                stage_fails = funcs[stage](repo, rules, rules_path)
+            else:
+                stage_fails = funcs[stage](repo, rules)
+            fails.extend((stage, message) for message in stage_fails)
+        except GitError as e:
+            fails.append((stage, f'git error: {e}'))
     print(f'# harness_check {args.cmd}  repo={repo}  rules={os.path.basename(rules_path)}')
     if not fails:
         print('[PASS] 无违规')
