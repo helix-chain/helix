@@ -476,24 +476,25 @@ class IntentCodeMismatchDetector:
     # ── Helpers ──────────────────────────────
 
     def _extract_function_body(self, source: str, func_name: str) -> str:
-        """Brace-counting extractor. Returns FULL function (signature + body)."""
+        """Return the masked source slice for the first named function body."""
         import re
+        masked = mask_comments_and_strings(source)
         pattern = rf"function\s+{re.escape(func_name)}\s*\("
-        match = re.search(pattern, source)
+        match = re.search(pattern, masked)
         if not match:
             return ""
-        idx = source.find("{", match.end())
+        idx = masked.find("{", match.end())
         if idx < 0:
             return ""
         depth = 1
         i = idx + 1
-        while i < len(source) and depth > 0:
-            if source[i] == "{":
+        while i < len(masked) and depth > 0:
+            if masked[i] == "{":
                 depth += 1
-            elif source[i] == "}":
+            elif masked[i] == "}":
                 depth -= 1
             i += 1
-        return source[match.start():i]
+        return masked[match.start():i]
 
     def _patterns_to_text(self, patterns: dict) -> str:
         """Convert code pattern dict to natural language for embedding."""

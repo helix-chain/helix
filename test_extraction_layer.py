@@ -94,5 +94,50 @@ class CommentIndependentRiskTests(unittest.TestCase):
         self.assertNotIn("missing_reentrancy_guard", patterns)
 
 
+class FunctionBodyBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.detector = mismatch_detector.IntentCodeMismatchDetector()
+
+    def test_comment_and_string_braces_do_not_truncate_the_body(self):
+        source = '''contract Vault {
+            struct Item { uint256 value; }
+            mapping(address => uint256) balances;
+            function withdraw() external {
+                // }
+                string memory first = "bad }";
+                string memory second = '}';
+                /* } */
+                unchecked { balances[msg.sender] += 1; }
+                assembly { let local := 1 }
+                Item memory item = Item({value: 1});
+                (bool ok, ) = msg.sender.call{value: 1}("");
+                balances[msg.sender] = 0;
+            }
+            function after() external { balances[msg.sender] = 2; }
+        }'''
+        body = self.detector._extract_function_body(source, "withdraw")
+        self.assertTrue(body.endswith("}"))
+        self.assertIn("balances[msg.sender] = 0;", body)
+        self.assertNotIn("function after", body)
+        patterns = self.detector.code_encoder.summarize(body)
+        self.assertIn("external_call_before_state_update", patterns)
+
+    def test_nested_code_braces_are_balanced(self):
+        source = '''contract Vault {
+            struct Item { uint256 value; }
+            function update() external {
+                unchecked { balances[msg.sender] += 1; }
+                assembly { let local := 1 }
+                Item memory item = Item({value: 1});
+                balances[msg.sender] = 2;
+            }
+            function after() external { balances[msg.sender] = 3; }
+        }'''
+        body = self.detector._extract_function_body(source, "update")
+        self.assertIn("Item memory item", body)
+        self.assertIn("balances[msg.sender] = 2;", body)
+        self.assertNotIn("function after", body)
+
+
 if __name__ == "__main__":
     unittest.main()
