@@ -163,22 +163,40 @@ def _extract_function_units_from_masked(masked_source: str) -> tuple[FunctionUni
             opening = brace_stack.pop()
             braces[opening] = token_index
 
+    # The forward walk from a token is the same whichever header started it, so
+    # its result is remembered for every token it passed: each token is walked
+    # once even when many headers lack a terminator.
+    terminator_from = {}
+
     def find_terminator(parameter_close: int):
         cursor = parameter_close + 1
+        walked = []
+        result = None
         while cursor < len(tokens):
+            if cursor in terminator_from:
+                result = terminator_from[cursor]
+                break
+            walked.append(cursor)
             value = tokens[cursor][0]
             if value == "(":
                 close = parentheses.get(cursor)
                 if close is None:
-                    return None
+                    break
                 cursor = close + 1
                 continue
             if value in (")", "}"):
-                return None
+                break
             if value in ("{", ";"):
-                return cursor
+                result = cursor
+                break
             cursor += 1
-        return None
+        for position in walked:
+            terminator_from[position] = result
+        return result
+
+    external_before = [0]
+    for value, _, _ in tokens:
+        external_before.append(external_before[-1] + (value == "external"))
 
     def make_unit(name: str, kind: str, start_index: int, terminator: int):
         value, body_offset, term_end = tokens[terminator]
@@ -235,9 +253,8 @@ def _extract_function_units_from_masked(masked_source: str) -> tuple[FunctionUni
         terminator = find_terminator(parameter_close)
         if terminator is None or tokens[terminator][0] != "{":
             continue
-        header = masked_source[tokens[parameter_close][2]:tokens[terminator][1]]
-        if not re.search(r"\bexternal\b", header):
-            continue
+        if external_before[terminator] == external_before[parameter_close + 1]:
+            continue  # the header between the parameters and the body has no external
         units.append(make_unit(value, value, token_index, terminator))
 
     units.sort(key=lambda unit: unit.start)
@@ -249,6 +266,16 @@ def _source_index(source: str) -> tuple[str, tuple[FunctionUnit, ...]]:
     """Cache the masked source and its parsed function units for one input."""
     masked = mask_comments_and_strings(source)
     return masked, _extract_function_units_from_masked(masked)
+
+
+@lru_cache(maxsize=16)
+def _first_bodies(source: str) -> dict:
+    """Map each name to its first unit with a body (one pass per input)."""
+    first = {}
+    for unit in _source_index(source)[1]:
+        if unit.has_body and unit.name not in first:
+            first[unit.name] = unit
+    return first
 
 
 def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:
@@ -639,11 +666,9 @@ class IntentCodeMismatchDetector:
 
     def _extract_function_body(self, source: str, func_name: str) -> str:
         """Return the masked source slice for the first named function body."""
-        masked, units = _source_index(source)
-        for unit in units:
-            if unit.name == func_name and unit.has_body:
-                return masked[unit.start:unit.end]
-        return ""
+        masked, _ = _source_index(source)
+        unit = _first_bodies(source).get(func_name)
+        return masked[unit.start:unit.end] if unit else ""
 
     def _patterns_to_text(self, patterns: dict) -> str:
         """Convert code pattern dict to natural language for embedding."""

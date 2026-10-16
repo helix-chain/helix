@@ -307,13 +307,17 @@ def _documented_functions(count):
     return "\n".join(lines)
 
 
-def _best_time(action, repeats=3):
+def _best_time(action, source, repeats=3):
+    """Best of a few timings of action(source). Each run gets a distinct copy of
+    the source (a unique trailing comment), so the per-source cache cannot hide
+    the work being measured."""
     import time
 
     best = None
-    for _ in range(repeats):
+    for run in range(repeats):
+        fresh = f"{source}\n// timing run {run} {time.perf_counter_ns()}\n"
         started = time.perf_counter()
-        action()
+        action(fresh)
         elapsed = time.perf_counter() - started
         best = elapsed if best is None else min(best, elapsed)
     return best
@@ -326,12 +330,56 @@ class IntentExtractionTests(unittest.TestCase):
         intents = extract(large)
         self.assertEqual(len(intents), 2000)
         self.assertEqual(intents["update1999"], "@notice Update slot 1999")
-        small_time = _best_time(lambda: extract(small))
-        large_time = _best_time(lambda: extract(large))
+        small_time = _best_time(extract, small)
+        large_time = _best_time(extract, large)
         # Four times the input: about 4x when linear, 16x when quadratic.
         self.assertLess(
             large_time, 10 * small_time + 0.1,
             f"500 functions {small_time:.3f}s, 2000 functions {large_time:.3f}s",
+        )
+
+    def test_unit_extraction_grows_linearly_on_unterminated_headers(self):
+        extract = mismatch_detector.extract_function_units
+        for label, line in (
+            ("named", "    function f{index}(uint256 a) external"),
+            ("receive", "    receive() external payable ,"),
+        ):
+            with self.subTest(header=label):
+                def build(count):
+                    rows = ["contract Broken {"]
+                    rows.extend(line.format(index=index) for index in range(count))
+                    rows.append("}")
+                    return "\n".join(rows)
+
+                small_time = _best_time(extract, build(1000))
+                large_time = _best_time(extract, build(4000))
+                self.assertLess(
+                    large_time, 10 * small_time + 0.05,
+                    f"1000 headers {small_time:.3f}s, 4000 headers {large_time:.3f}s",
+                )
+
+    def test_body_lookup_per_function_grows_linearly(self):
+        import time
+
+        detector = mismatch_detector.IntentCodeMismatchDetector()
+
+        def lookup_time(count):
+            source = _documented_functions(count)
+            names = [unit.name for unit in mismatch_detector.extract_function_units(source)]
+            detector._extract_function_body(source, names[0])  # parse once, outside the timing
+            best = None
+            for _ in range(3):
+                started = time.perf_counter()
+                for name in names:
+                    detector._extract_function_body(source, name)
+                elapsed = time.perf_counter() - started
+                best = elapsed if best is None else min(best, elapsed)
+            return best
+
+        small_time, large_time = lookup_time(1000), lookup_time(4000)
+        self.assertLess(
+            large_time, 10 * small_time + 0.02,
+            f"1000 lookups {small_time:.4f}s, 4000 lookups {large_time:.4f}s",
         )
 
     def test_many_comment_lines_before_a_function_stay_fast(self):
