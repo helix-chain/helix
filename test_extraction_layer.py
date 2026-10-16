@@ -201,5 +201,70 @@ class NamedFunctionUnitTests(unittest.TestCase):
         )
 
 
+class SpecialFunctionTests(unittest.TestCase):
+    def _units(self, source):
+        extract=getattr(mismatch_detector, "extract_function_units", None)
+        self.assertTrue(callable(extract), "function unit extractor is missing")
+        return extract(source)
+
+    def test_receive_fallback_and_legacy_fallback_are_units(self):
+        source='''contract Wallet {
+            mapping(address => uint256) balances;
+            receive() external payable {
+                (bool ok, ) = msg.sender.call{value: 1}("");
+                balances[msg.sender] = 0;
+            }
+            fallback() external payable { balances[msg.sender] = 1; }
+            function () payable { balances[msg.sender] = 2; }
+            function helper() external { receive(); fallback(); }
+            function (uint256) external callback;
+        }'''
+        units=self._units(source)
+        special=[unit for unit in units if unit.kind in ("receive", "fallback")]
+        self.assertEqual([unit.name for unit in special], ["receive", "fallback", "fallback"])
+        self.assertTrue(all(unit.has_body for unit in special))
+        receive_body=mismatch_detector.IntentCodeMismatchDetector()._extract_function_body(source, "receive")
+        patterns=mismatch_detector.CodeEncoder().summarize(receive_body)
+        self.assertIn("external_call_before_state_update", patterns)
+        self.assertIn("missing_reentrancy_guard", patterns)
+        intents=mismatch_detector.IntentExtractor().extract(source)
+        self.assertIn("receive", intents)
+        self.assertIn("fallback", intents)
+
+    def test_calls_and_function_type_variables_are_not_units(self):
+        source='''contract Wallet {
+            function helper() external {
+                receive();
+                fallback();
+                this.receive();
+            }
+            function (uint256) external callback;
+        }'''
+        units=self._units(source)
+        special=[unit for unit in units if unit.kind in ("receive", "fallback")]
+        self.assertEqual(special, [])
+        self.assertEqual([unit.name for unit in units], ["helper"])
+
+    def test_cli_reports_an_empty_scan_as_an_error(self):
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+
+        repo=Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+            sol_path=Path(temp_dir) / "empty.sol"
+            sol_path.write_text("contract Empty {}", encoding="utf-8")
+            proc=subprocess.run(
+                [sys.executable, str(repo / "helix_scan.py"), "--json", str(sol_path)],
+                cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.stdout, "")
+        self.assertTrue(proc.stderr.startswith("[ERROR]"), proc.stderr)
+        self.assertIn("no analysable functions were found", proc.stderr.lower())
+        self.assertIn("nothing was scanned", proc.stderr.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
