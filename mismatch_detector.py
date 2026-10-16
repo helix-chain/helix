@@ -268,11 +268,17 @@ class IntentExtractor:
         comment_pattern = re.compile(
             r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*$"
         )
-        _, units = _source_index(source_code)
+        masked, units = _source_index(source_code)
         for unit in units:
             if not unit.has_body:
                 continue
-            prefix = source_code[:unit.start]
+            # Only the comments and whitespace between the preceding code and
+            # this definition can document it. Searching that gap instead of the
+            # whole prefix keeps extraction linear and keeps string contents out.
+            gap_start = unit.start
+            while gap_start > 0 and masked[gap_start - 1].isspace():
+                gap_start -= 1
+            prefix = source_code[gap_start:unit.start]
             comment_match = comment_pattern.search(prefix)
             comment_block = comment_match.group(1) if comment_match else ""
             parts = re.findall(r"@notice\s+(.+)|@dev\s+(.+)|///\s*(.+)", comment_block)
