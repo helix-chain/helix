@@ -296,6 +296,24 @@ class SpecialFunctionTests(unittest.TestCase):
         self.assertEqual(special, [])
         self.assertEqual([unit.name for unit in units], ["helper"])
 
+    def test_a_call_followed_by_a_control_block_is_not_a_special_function_unit(self):
+        """Inside inline assembly a Yul function may be called receive; a call
+        of it followed by an if block must not look like a receive definition
+        (no external keyword between the parameters and the brace)."""
+        source = '''contract C {
+            function run() external {
+                assembly {
+                    /// @notice safe helper
+                    function receive() -> r { r := 1 }
+                    let x := receive()
+                    if x { mstore(0, 0) }
+                }
+            }
+        }'''
+        units = self._units(source)
+        self.assertEqual([unit.name for unit in units], ["run", "receive"])
+        self.assertEqual(mismatch_detector.IntentExtractor().extract(source)["receive"], "@notice safe helper")
+
     def test_cli_reports_an_empty_scan_as_an_error(self):
         import subprocess
         import sys
@@ -468,7 +486,7 @@ class IntentExtractionTests(unittest.TestCase):
         import re
 
         reference = re.compile(
-            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\r?\n)*)[ \t]*\Z"
+            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*\Z"
         )
         pieces = [
             "/// note\n", "    /// @notice Safe\n", "/* block */\n", "  /** @dev doc */\n",
@@ -566,15 +584,23 @@ class IntentExtractionTests(unittest.TestCase):
         self.assertIn("update", intents)
         self.assertLess(elapsed, 2.0, f"20 block-comment lines took {elapsed:.1f}s")
 
-    def test_block_natspec_with_crlf_line_endings_becomes_intent(self):
+    def test_block_natspec_followed_by_crlf_is_not_associated_as_before(self):
+        """Unchanged behaviour, pinned on purpose: a block comment whose line
+        ends in CR LF is not taken as documentation when the text is passed to
+        the API as is (the CLI reads files in text mode, which turns CR LF into
+        LF first). Associating it would change the intent text, and with it the
+        score, of CRLF sources compared with earlier versions."""
         source = (
             "contract Vault {\r\n"
             "    /** @notice Safely withdraw funds */\r\n"
             "    function withdraw() external { balance = 0; }\r\n"
             "}\r\n"
         )
-        intent = mismatch_detector.IntentExtractor().extract(source)["withdraw"]
-        self.assertIn("Safely withdraw funds", intent)
+        extract = mismatch_detector.IntentExtractor().extract
+        self.assertEqual(extract(source)["withdraw"], "withdraw")
+        self.assertEqual(extract(source.replace("\r\n", "\n"))["withdraw"], "Safely withdraw funds */")
+        triple_slash = source.replace("/** @notice Safely withdraw funds */", "/// @notice Safely withdraw funds")
+        self.assertEqual(extract(triple_slash)["withdraw"], "@notice Safely withdraw funds")
 
     def test_undocumented_function_intent_is_its_name(self):
         source = '''contract Plain {

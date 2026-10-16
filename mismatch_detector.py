@@ -291,16 +291,16 @@ def _doc_comment_block(gap: str) -> str:
     of the original per-function expression captures when it is anchored at
     the definition:
 
-        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\r?\\n)*)[ \\t]*\\Z
+        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\n)*)[ \\t]*\\Z
 
-    (the original expression had no \\r?, so a block comment in a file with
-    CRLF line endings never counted as documentation; here it does).
     That is the run of items starting at the leftmost position from which the
     rest of the gap splits into items (a /// line, or anything from /* to a */
-    that is followed by blanks and a line break) plus trailing blanks. The
-    expression can backtrack exponentially when the split fails; here every
-    position is decided once, from the end, so the work is linear in the gap
-    length. A blank line between the comments and the definition ends the run.
+    that is followed by blanks and a line feed) plus trailing blanks. As in
+    the original, a block comment whose line ends in CR LF does not count as
+    documentation. The expression can backtrack exponentially when the split
+    fails; here every position is decided once, from the end, so the work is
+    linear in the gap length. A blank line between the comments and the
+    definition ends the run.
     """
     length = len(gap)
     boundary = length  # the run of items must end before the trailing blanks
@@ -330,8 +330,6 @@ def _doc_comment_block(gap: str) -> str:
         ends_here = False
         if gap.startswith("*/", index):
             cursor = after_blanks[index + 2]
-            if cursor < length and gap[cursor] == "\r":
-                cursor += 1
             ends_here = cursor < length and gap[cursor] == "\n" and splits_from[cursor + 1]
         block_end_from[index] = ends_here or block_end_from[index + 1]
 
