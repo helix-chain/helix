@@ -87,6 +87,17 @@ fn validate_score(name: &str, score: f64) -> Result<(), String> {
     Ok(())
 }
 
+fn outcome_from_response(status: reqwest::StatusCode, body: &str) -> DetectorOutcome {
+    if !status.is_success() {
+        return DetectorOutcome::Unavailable(format!("http status {}", status.as_u16()));
+    }
+
+    match parse_report(body) {
+        Ok(report) => DetectorOutcome::Scanned(report),
+        Err(message) => DetectorOutcome::Unavailable(message),
+    }
+}
+
 /// Result of a deploy-time scan. `Unavailable` is the fail-open outcome and
 /// carries a reason for logging — it is never an error the caller must handle.
 #[derive(Debug, Clone)]
@@ -126,13 +137,17 @@ impl DetectorClient {
             .send()
             .await;
         match sent {
-            Ok(resp) => match resp.text().await {
-                Ok(body) => match parse_report(&body) {
-                    Ok(report) => DetectorOutcome::Scanned(report),
-                    Err(message) => DetectorOutcome::Unavailable(message),
-                },
-                Err(e) => DetectorOutcome::Unavailable(format!("decode: {e}")),
-            },
+            Ok(resp) => {
+                let status = resp.status();
+                if !status.is_success() {
+                    outcome_from_response(status, "")
+                } else {
+                    match resp.text().await {
+                        Ok(body) => outcome_from_response(status, &body),
+                        Err(e) => DetectorOutcome::Unavailable(format!("decode: {e}")),
+                    }
+                }
+            }
             Err(e) => DetectorOutcome::Unavailable(format!("transport: {e}")),
         }
     }
@@ -227,7 +242,7 @@ mod tests {
         assert!(error.starts_with("decode:"), "got {error:?}");
     }
 
-    async fn scan_body(body: String) -> DetectorOutcome {
+    async fn scan_response(status: axum::http::StatusCode, body: String) -> DetectorOutcome {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind loopback listener");
@@ -236,7 +251,12 @@ mod tests {
             "/scan",
             axum::routing::post(move || {
                 let body = body.clone();
-                async move { axum::response::Response::new(axum::body::Body::from(body)) }
+                async move {
+                    axum::response::Response::builder()
+                        .status(status)
+                        .body(axum::body::Body::from(body))
+                        .expect("build loopback response")
+                }
             }),
         );
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
@@ -256,6 +276,45 @@ mod tests {
         outcome
     }
 
+    #[test]
+    fn response_outcome_checks_status_before_parsing_body() {
+        let valid = valid_report_json("LOW");
+        let mut failures = Vec::new();
+        for (body_kind, body) in [("valid report", valid.as_str()), ("error body", "gateway error")] {
+            for code in [400, 422, 500, 503] {
+                let status = reqwest::StatusCode::from_u16(code).expect("valid status");
+                match outcome_from_response(status, body) {
+                    DetectorOutcome::Unavailable(reason)
+                        if reason.starts_with("http status")
+                            && reason.contains(&code.to_string()) => {}
+                    outcome => failures.push(format!(
+                        "{body_kind} with status {code} returned {outcome:?}"
+                    )),
+                }
+            }
+        }
+        assert!(failures.is_empty(), "unexpected outcomes: {failures:?}");
+
+        assert!(matches!(
+            outcome_from_response(reqwest::StatusCode::OK, &valid),
+            DetectorOutcome::Scanned(DetectorReport { .. })
+        ));
+        match outcome_from_response(reqwest::StatusCode::NO_CONTENT, "") {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("decode:") || reason.starts_with("schema drift:") => {}
+            outcome => panic!("empty success body must fail report decoding, got {outcome:?}"),
+        }
+        match outcome_from_response(reqwest::StatusCode::FOUND, "") {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("http status") && reason.contains("302") => {}
+            outcome => panic!("redirect status must be unavailable, got {outcome:?}"),
+        }
+    }
+
+    async fn scan_body(body: String) -> DetectorOutcome {
+        scan_response(axum::http::StatusCode::OK, body).await
+    }
+
     #[tokio::test]
     async fn scan_source_returns_scanned_for_valid_body_and_unavailable_for_drift() {
         let valid = valid_report_json("CRITICAL");
@@ -270,6 +329,42 @@ mod tests {
                 assert!(reason.contains("schema drift"), "got {reason:?}");
             }
             outcome => panic!("drifted report must fail open as unavailable, got {outcome:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn scan_source_rejects_error_statuses_before_parsing_body() {
+        let mut failures = Vec::new();
+        for (body_kind, body) in [
+            ("valid report", valid_report_json("LOW")),
+            ("error body", "gateway error".to_owned()),
+        ] {
+            for code in [400, 422, 500, 503] {
+                let status = axum::http::StatusCode::from_u16(code).expect("valid status");
+                match scan_response(status, body.clone()).await {
+                    DetectorOutcome::Unavailable(reason)
+                        if reason.starts_with("http status") && reason.contains(&code.to_string()) => {}
+                    outcome => failures.push(format!(
+                        "{body_kind} with status {code} returned {outcome:?}"
+                    )),
+                }
+            }
+        }
+        assert!(failures.is_empty(), "unexpected outcomes: {failures:?}");
+    }
+
+    #[tokio::test]
+    async fn scan_source_handles_empty_success_and_redirect_responses() {
+        match scan_response(axum::http::StatusCode::NO_CONTENT, String::new()).await {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("decode:") || reason.starts_with("schema drift:") => {}
+            outcome => panic!("empty success response must fail report decoding, got {outcome:?}"),
+        }
+
+        match scan_response(axum::http::StatusCode::FOUND, String::new()).await {
+            DetectorOutcome::Unavailable(reason)
+                if reason.starts_with("http status") && reason.contains("302") => {}
+            outcome => panic!("redirect response must be unavailable, got {outcome:?}"),
         }
     }
 

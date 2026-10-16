@@ -522,6 +522,32 @@ class TestReentrancyGuardNoExemption(unittest.TestCase):
                 )
 
 
+def _assert_risk_labels_match_producer(producer, rust_labels, test_case):
+    scores = [index / 1000 for index in range(1001)]
+    scores.extend(
+        [
+            0.0999999,
+            0.1,
+            0.2999999,
+            0.3,
+            0.4499999,
+            0.45,
+            0.9999999,
+            1.0,
+            -0.5,
+            1.5,
+            10.0,
+        ]
+    )
+    producer_labels = {
+        producer._score_to_risk(score).upper() for score in scores
+    }
+    test_case.assertSetEqual(
+        {label.upper() for label in rust_labels},
+        producer_labels,
+    )
+
+
 class TestRustConsumerContract(unittest.TestCase):
     """Keep the Rust wire schema aligned with the Python report producer."""
 
@@ -608,10 +634,25 @@ class TestRustConsumerContract(unittest.TestCase):
                 )
 
         producer = md.IntentCodeMismatchDetector()
-        producer_labels = {
-            producer._score_to_risk(score).upper() for score in (0.0, 0.10, 0.30, 0.45)
-        }
-        self.assertSetEqual({label.upper() for label in rust_labels}, producer_labels)
+        _assert_risk_labels_match_producer(producer, rust_labels, self)
+
+    def test_risk_label_sweep_rejects_producer_only_label(self):
+        producer = md.IntentCodeMismatchDetector()
+        rust_labels = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
+        original_score_to_risk = md.IntentCodeMismatchDetector._score_to_risk
+
+        def score_with_extra_label(instance, score):
+            if score > 0.90:
+                return "EXTREME"
+            return original_score_to_risk(instance, score)
+
+        try:
+            md.IntentCodeMismatchDetector._score_to_risk = score_with_extra_label
+            with self.assertRaises(AssertionError) as error:
+                _assert_risk_labels_match_producer(producer, rust_labels, self)
+            self.assertIn("EXTREME", str(error.exception))
+        finally:
+            md.IntentCodeMismatchDetector._score_to_risk = original_score_to_risk
 
 
 if __name__ == "__main__":
