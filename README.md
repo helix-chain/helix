@@ -131,6 +131,7 @@ Each **seed signature** is a portable metadata record — id, attack class, chai
 | **CI** | GitHub Actions regression guard (harness gate + output-contract test + smoke + proxy FP) |
 | **Known Limitations** | 3 cases: off-chain key leakage, Solidity <0.8 integer overflow, compiler-level bugs |
 | **Out of MVP Scope** | 5 cases: rug pulls, pure logic errors |
+| **Detector limitation** | One report per function name: when a name is defined more than once in a file (overloads, overrides in flattened sources), only the first body is analysed, with the last definition's comment as its intent. A vulnerable second definition can be missed. |
 
 > **2026-07 measurement-bug note.** The proxy-FP gate used to read a stale
 > output field with a silent `0.0` default, so it could never fail — its

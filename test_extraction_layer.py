@@ -354,6 +354,50 @@ def _best_time(action, source, repeats=3):
     return best
 
 
+class SummarizeGrowthTests(unittest.TestCase):
+    def test_comment_inside_require_grows_linearly(self):
+        """Masking turns a comment into spaces; the guard checks must stay linear
+        on a long run of them (a comment inside require( is valid Solidity)."""
+        summarize = mismatch_detector.CodeEncoder().summarize
+
+        def build(kilobytes):
+            comment = "/*" + "x" * (kilobytes * 1024) + "*/"
+            return "function f() external { require(" + comment + " ok); balance = 0; }"
+
+        small_time = _best_time(summarize, build(8), repeats=2)
+        large_time = _best_time(summarize, build(32), repeats=2)
+        self.assertLess(
+            large_time, 10 * small_time + 0.05,
+            f"8 KB comment {small_time:.3f}s, 32 KB comment {large_time:.3f}s",
+        )
+
+    def test_whitespace_run_after_require_grows_linearly(self):
+        summarize = mismatch_detector.CodeEncoder().summarize
+
+        def build(kilobytes):
+            return "function f() external { require(" + " " * (kilobytes * 1024) + "ok); balance = 0; }"
+
+        small_time = _best_time(summarize, build(8), repeats=2)
+        large_time = _best_time(summarize, build(32), repeats=2)
+        self.assertLess(
+            large_time, 10 * small_time + 0.05,
+            f"8 KB blanks {small_time:.3f}s, 32 KB blanks {large_time:.3f}s",
+        )
+
+    def test_locked_guard_spellings_are_still_recognised(self):
+        summarize = mismatch_detector.CodeEncoder().summarize
+        call = '(bool ok, ) = msg.sender.call{value: 1}(""); balances[msg.sender] = 0;'
+        for guard in ("require(!_locked);", "require( ! _locked);", "require(_locked == false);",
+                      "require(\n    !_locked\n);", "require(_locked);"):
+            with self.subTest(guard=guard):
+                patterns = summarize("function f() external { " + guard + " " + call + " }")
+                self.assertNotIn("external_call_before_state_update", patterns)
+        for not_guard in ("require(!unlocked);", "require(ok);", "require(!!_locked);"):
+            with self.subTest(not_guard=not_guard):
+                patterns = summarize("function f() external { " + not_guard + " " + call + " }")
+                self.assertIn("external_call_before_state_update", patterns)
+
+
 class IntentExtractionTests(unittest.TestCase):
     def test_intent_extraction_time_grows_linearly_with_function_count(self):
         extract = mismatch_detector.IntentExtractor().extract
@@ -395,7 +439,10 @@ class IntentExtractionTests(unittest.TestCase):
         detector = mismatch_detector.IntentCodeMismatchDetector()
 
         def lookup_time(count):
-            source = _documented_functions(count)
+            # A distinct text per call: the per-source cache is keyed by equal
+            # text, and an equal but separate string would be compared in full
+            # on every lookup, which is not what this test measures.
+            source = _documented_functions(count) + f"\n// body lookup {time.perf_counter_ns()}\n"
             names = [unit.name for unit in mismatch_detector.extract_function_units(source)]
             detector._extract_function_body(source, names[0])  # parse once, outside the timing
             best = None
@@ -421,7 +468,7 @@ class IntentExtractionTests(unittest.TestCase):
         import re
 
         reference = re.compile(
-            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\r?\n)*)[ \t]*$"
+            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\r?\n)*)[ \t]*\Z"
         )
         pieces = [
             "/// note\n", "    /// @notice Safe\n", "/* block */\n", "  /** @dev doc */\n",
@@ -436,6 +483,54 @@ class IntentExtractionTests(unittest.TestCase):
             match = reference.search(gap)
             expected = match.group(1) if match else ""
             self.assertEqual(mismatch_detector._doc_comment_block(gap), expected, repr(gap))
+
+    def test_doc_comment_needs_to_touch_the_definition(self):
+        """A blank line between a doc comment and the definition ends the
+        association, whatever the indentation or line ending. The earlier
+        expression behaved this way for LF files; CRLF files must agree."""
+        layouts = {
+            "directly above, column 0": "/// @notice Safely withdraw\nfunction withdraw() external { b = 0; }\n",
+            "directly above, indented": "contract A {\n    /// @notice Safely withdraw\n    function withdraw() external { b = 0; }\n}\n",
+            "one blank line, column 0": "/// @notice Safely withdraw\n\nfunction withdraw() external { b = 0; }\n",
+            "one blank line, indented": "contract A {\n    /// @notice Safely withdraw\n\n    function withdraw() external { b = 0; }\n}\n",
+            "two blank lines, column 0": "/// @notice Safely withdraw\n\n\nfunction withdraw() external { b = 0; }\n",
+        }
+        expected = {
+            "directly above, column 0": "@notice Safely withdraw",
+            "directly above, indented": "@notice Safely withdraw",
+            "one blank line, column 0": "withdraw",
+            "one blank line, indented": "withdraw",
+            "two blank lines, column 0": "withdraw",
+        }
+        extract = mismatch_detector.IntentExtractor().extract
+        for name, source in layouts.items():
+            for ending, text in (("LF", source), ("CRLF", source.replace("\n", "\r\n"))):
+                with self.subTest(layout=name, line_ending=ending):
+                    self.assertEqual(extract(text)["withdraw"], expected[name])
+
+    def test_block_doc_comment_followed_by_blanks_before_the_line_break(self):
+        for blanks in (" ", "\t", "  \t "):
+            with self.subTest(blanks=repr(blanks)):
+                source = (
+                    "contract A {\n"
+                    f"    /** @notice Safely withdraw your balance */{blanks}\n"
+                    "    function withdraw() external { b = 0; }\n"
+                    "}\n"
+                )
+                intent = mismatch_detector.IntentExtractor().extract(source)["withdraw"]
+                self.assertIn("Safely withdraw your balance", intent)
+
+    def test_untagged_comment_intent_is_cut_at_200_characters(self):
+        words = " ".join(f"w{index}" for index in range(100))
+        source = f"contract A {{\n    /* {words} */\n    function f() external {{ b = 0; }}\n}}\n"
+        intent = mismatch_detector.IntentExtractor().extract(source)["f"]
+        self.assertEqual(len(intent), 200)
+        self.assertTrue(words.startswith(intent))
+
+    def test_a_header_without_a_body_does_not_make_the_next_header_a_unit(self):
+        source = "contract C { function a() function b() } }"
+        names = [unit.name for unit in mismatch_detector.extract_function_units(source)]
+        self.assertEqual(names, [])
 
     def test_comment_run_time_grows_linearly_with_its_length(self):
         extract = mismatch_detector.IntentExtractor().extract

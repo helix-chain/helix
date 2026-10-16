@@ -287,28 +287,25 @@ def _doc_comment_block(gap: str) -> str:
     """Return the documentation comments that end right before a definition.
 
     gap is the text between the preceding code and the definition, so it holds
-    only comments and whitespace. The result is the text that the earlier
-    regular expression captured with re.search:
+    only comments and whitespace. The result is what the comment-block group
+    of the original per-function expression captures when it is anchored at
+    the definition:
 
-        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\r?\\n)*)[ \\t]*$
+        ((?:[ \\t]*///[^\\n]*\\n|[ \\t]*/\\*[\\s\\S]*?\\*/[ \\t]*\\r?\\n)*)[ \\t]*\\Z
 
-    i.e. the run of items starting at the leftmost position from which the rest
-    of the gap splits into items (a /// line, or anything from /* to a */ that
-    is followed by blanks and a line break) and trailing blanks. The regex can
-    backtrack exponentially when the split fails; here every position is
-    decided once, from the end, so the work is linear in the gap length.
+    (the original expression had no \\r?, so a block comment in a file with
+    CRLF line endings never counted as documentation; here it does).
+    That is the run of items starting at the leftmost position from which the
+    rest of the gap splits into items (a /// line, or anything from /* to a */
+    that is followed by blanks and a line break) plus trailing blanks. The
+    expression can backtrack exponentially when the split fails; here every
+    position is decided once, from the end, so the work is linear in the gap
+    length. A blank line between the comments and the definition ends the run.
     """
     length = len(gap)
-    # Where the run of items must end: before the trailing blanks, or, because
-    # $ also matches just before a final line feed, before a blank last line.
-    boundary = length
-    if gap.endswith("\n"):
-        last_line = gap.rfind("\n", 0, length - 1) + 1
-        if gap[last_line:length - 1].strip(" \t") == "":
-            boundary = last_line
-    else:
-        while boundary > 0 and gap[boundary - 1] in " \t":
-            boundary -= 1
+    boundary = length  # the run of items must end before the trailing blanks
+    while boundary > 0 and gap[boundary - 1] in " \t":
+        boundary -= 1
     if boundary == 0 or gap[boundary - 1] != "\n":
         return ""
 
@@ -435,7 +432,9 @@ class CodeEncoder:
         has_reentrancy_guard = bool(
             re.search(r'nonReentrant|ReentrancyGuard', function_source, re.IGNORECASE)
         )
-        if re.search(r'require\s*\(\s*!?\s*_locked', body_only):
+        # (?:!\s*)? instead of !?\s*: the same strings, but a long run of blanks
+        # (for example a masked comment) has only one way to be consumed.
+        if re.search(r'require\s*\(\s*(?:!\s*)?_locked', body_only):
             has_reentrancy_guard = True
         if re.search(r'_locked\s*=\s*true', body_only, re.IGNORECASE):
             has_reentrancy_guard = True
