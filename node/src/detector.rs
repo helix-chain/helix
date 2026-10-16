@@ -280,7 +280,10 @@ mod tests {
     fn response_outcome_checks_status_before_parsing_body() {
         let valid = valid_report_json("LOW");
         let mut failures = Vec::new();
-        for (body_kind, body) in [("valid report", valid.as_str()), ("error body", "gateway error")] {
+        for (body_kind, body) in [
+            ("valid report", valid.as_str()),
+            ("error body", "gateway error"),
+        ] {
             for code in [400, 422, 500, 503] {
                 let status = reqwest::StatusCode::from_u16(code).expect("valid status");
                 match outcome_from_response(status, body) {
@@ -343,7 +346,8 @@ mod tests {
                 let status = axum::http::StatusCode::from_u16(code).expect("valid status");
                 match scan_response(status, body.clone()).await {
                     DetectorOutcome::Unavailable(reason)
-                        if reason.starts_with("http status") && reason.contains(&code.to_string()) => {}
+                        if reason.starts_with("http status")
+                            && reason.contains(&code.to_string()) => {}
                     outcome => failures.push(format!(
                         "{body_kind} with status {code} returned {outcome:?}"
                     )),
