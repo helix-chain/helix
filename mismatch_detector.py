@@ -256,6 +256,9 @@ def extract_function_units(source: str) -> tuple[FunctionUnit, ...]:
     return _source_index(source)[1]
 
 
+_MAX_DOC_LINES = 200
+
+
 class IntentExtractor:
     """
     Extracts human intent from Solidity NatSpec comments and function names.
@@ -265,18 +268,27 @@ class IntentExtractor:
     def extract(self, source_code: str) -> dict[str, str]:
         import re
         results = {}
+        # A block comment is matched as one unit (it cannot run past its own
+        # closing marker), so a run of comments has a single parse and a failed
+        # match cannot backtrack exponentially.
         comment_pattern = re.compile(
-            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*[\s\S]*?\*/[ \t]*\n)*)[ \t]*$"
+            r"((?:[ \t]*///[^\n]*\n|[ \t]*/\*(?:[^*]|\*(?!/))*\*/[ \t]*\r?\n)*)[ \t]*$"
         )
         masked, units = _source_index(source_code)
         for unit in units:
             if not unit.has_body:
                 continue
             # Only the comments and whitespace between the preceding code and
-            # this definition can document it. Searching that gap instead of the
-            # whole prefix keeps extraction linear and keeps string contents out.
+            # this definition can document it. Searching that gap (at most its
+            # last _MAX_DOC_LINES lines) instead of the whole prefix keeps
+            # extraction linear and keeps string contents out.
             gap_start = unit.start
+            lines_seen = 0
             while gap_start > 0 and masked[gap_start - 1].isspace():
+                if masked[gap_start - 1] == "\n":
+                    lines_seen += 1
+                    if lines_seen > _MAX_DOC_LINES:
+                        break
                 gap_start -= 1
             prefix = source_code[gap_start:unit.start]
             comment_match = comment_pattern.search(prefix)

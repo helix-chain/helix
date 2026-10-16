@@ -298,22 +298,66 @@ class RiskPatternKeyTests(unittest.TestCase):
         self.assertEqual(list(mismatch_detector.CodeEncoder.RISK_PATTERNS), expected)
 
 
+def _documented_functions(count):
+    lines = ["contract Many {"]
+    for index in range(count):
+        lines.append(f"    /// @notice Update slot {index}")
+        lines.append(f"    function update{index}(uint256 value) external {{ slots[{index}] = value; }}")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _best_time(action, repeats=3):
+    import time
+
+    best = None
+    for _ in range(repeats):
+        started = time.perf_counter()
+        action()
+        elapsed = time.perf_counter() - started
+        best = elapsed if best is None else min(best, elapsed)
+    return best
+
+
 class IntentExtractionTests(unittest.TestCase):
     def test_intent_extraction_time_grows_linearly_with_function_count(self):
+        extract = mismatch_detector.IntentExtractor().extract
+        small, large = _documented_functions(500), _documented_functions(2000)
+        intents = extract(large)
+        self.assertEqual(len(intents), 2000)
+        self.assertEqual(intents["update1999"], "@notice Update slot 1999")
+        small_time = _best_time(lambda: extract(small))
+        large_time = _best_time(lambda: extract(large))
+        # Four times the input: about 4x when linear, 16x when quadratic.
+        self.assertLess(
+            large_time, 10 * small_time + 0.1,
+            f"500 functions {small_time:.3f}s, 2000 functions {large_time:.3f}s",
+        )
+
+    def test_many_comment_lines_before_a_function_stay_fast(self):
         import time
 
-        lines = ["contract Many {"]
-        for index in range(2000):
-            lines.append(f"    /// @notice Update slot {index}")
-            lines.append(f"    function update{index}(uint256 value) external {{ slots[{index}] = value; }}")
+        lines = ["contract Notes {"]
+        lines.extend(f"    /* retired helper {index} */" for index in range(20))
+        lines.append("    // lint-disable-next-line")
+        lines.append("    function update(uint256 value) external { slot = value; }")
         lines.append("}")
         source = "\n".join(lines)
         started = time.perf_counter()
         intents = mismatch_detector.IntentExtractor().extract(source)
         elapsed = time.perf_counter() - started
-        self.assertEqual(len(intents), 2000)
-        self.assertEqual(intents["update1999"], "@notice Update slot 1999")
-        self.assertLess(elapsed, 5.0, f"extracting 2000 documented functions took {elapsed:.1f}s")
+        self.assertIn("update", intents)
+        self.assertLess(elapsed, 2.0, f"20 block-comment lines took {elapsed:.1f}s")
+
+    def test_block_natspec_with_crlf_line_endings_becomes_intent(self):
+        source = (
+            "contract Vault {\r\n"
+            "    /** @notice Safely withdraw funds */\r\n"
+            "    function withdraw() external { balance = 0; }\r\n"
+            "}\r\n"
+        )
+        intent = mismatch_detector.IntentExtractor().extract(source)["withdraw"]
+        self.assertIn("Safely withdraw funds", intent)
 
     def test_comment_like_text_inside_a_string_does_not_become_intent(self):
         source = '''contract Labels {
