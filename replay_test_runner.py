@@ -48,6 +48,9 @@ def _known_map(values):
 
 def _validate_integrity(contracts, beyond_mvp, known_ids, pattern_gap_baseline):
     issues = []
+    if not contracts:
+        issues.append("no contracts to replay")
+
     sig_ids = []
     for index, contract in enumerate(contracts):
         if not isinstance(contract, dict) or not contract.get("sig_id"):
@@ -87,6 +90,29 @@ def _validate_integrity(contracts, beyond_mvp, known_ids, pattern_gap_baseline):
         )
 
     detectable_ids = contract_ids - set(beyond_mvp) - set(known_ids)
+    missing_expected_patterns = []
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        sig_id = contract.get("sig_id")
+        if sig_id not in detectable_ids:
+            continue
+        expected_patterns = contract.get("expected_patterns")
+        if (
+            not isinstance(expected_patterns, (list, tuple))
+            or not expected_patterns
+            or any(
+                not isinstance(pattern, str) or not pattern
+                for pattern in expected_patterns
+            )
+        ):
+            missing_expected_patterns.append(sig_id)
+    if missing_expected_patterns:
+        issues.append(
+            "detectable contracts need a non-empty expected_patterns: "
+            + ", ".join(sorted(set(missing_expected_patterns)))
+        )
+
     outside_baseline = set(pattern_gap_baseline) - detectable_ids
     if outside_baseline:
         issues.append(
@@ -195,8 +221,14 @@ def _evaluate_replay(
 
     pattern_gap_baselined = 0
     pattern_gap_new = 0
+    pattern_gap_stale = 0
     for result in detectable_results:
         if (
+            result["sig_id"] in pattern_gap_baseline
+            and result["pattern_confirmed"]
+        ):
+            pattern_gap_stale += 1
+        elif (
             result["detected"]
             and result["expected_patterns"]
             and not result["pattern_confirmed"]
@@ -209,7 +241,7 @@ def _evaluate_replay(
     detectable_scope = len(results) - beyond_count - known_count
     hit_rate = detected / detectable_scope * 100 if detectable_scope else 0
     exit_code = 2 if detector_errors else (
-        1 if missed or pattern_gap_new else 0
+        1 if missed or pattern_gap_new or pattern_gap_stale else 0
     )
     summary = {
         "total_attacks": len(contracts),
@@ -223,6 +255,7 @@ def _evaluate_replay(
         "pattern_confirmed": pattern_confirmed,
         "pattern_gap_baselined": pattern_gap_baselined,
         "pattern_gap_new": pattern_gap_new,
+        "pattern_gap_stale": pattern_gap_stale,
         "errors": detector_errors,
         "exit_code": exit_code,
     }
@@ -245,6 +278,7 @@ def _empty_summary(contracts, beyond_mvp, known_ids, *, errors, exit_code):
         "pattern_confirmed": 0,
         "pattern_gap_baselined": 0,
         "pattern_gap_new": 0,
+        "pattern_gap_stale": 0,
         "errors": errors,
         "exit_code": exit_code,
     }
@@ -274,6 +308,7 @@ def _print_summary(report):
     print(f"  PATTERN-CONFIRMED {summary['pattern_confirmed']}/{detectable}")
     print(f"  baselined gaps: {summary['pattern_gap_baselined']}")
     print(f"  NEW gaps: {summary['pattern_gap_new']}")
+    print(f"  stale pattern-gap baseline entries: {summary['pattern_gap_stale']}")
     print(f"  MISSED: {summary['missed']}")
     print(f"  ERRORS: {summary['errors']}")
     print(
@@ -445,14 +480,21 @@ def run_replay(
             f"score={result['score']:.4f}  {result['risk_level']:<10s}  "
             f"{expected_note}"
         )
-        if (
-            result["sig_id"] in pattern_gap_baseline
-            and result["pattern_confirmed"]
-        ):
-            print(
-                f"    TIGHTEN BASELINE: {result['sig_id']} is now "
-                "pattern-confirmed."
-            )
+
+    stale_baseline_ids = sorted(
+        result["sig_id"]
+        for result in results
+        if not result["is_beyond_mvp"]
+        and not result["is_known_limitation"]
+        and result["sig_id"] in pattern_gap_baseline
+        and result["pattern_confirmed"]
+    )
+    if stale_baseline_ids:
+        print(
+            "  FAIL: stale pattern-gap baseline ids: "
+            + ", ".join(stale_baseline_ids)
+            + "; remove them from PATTERN_GAP_BASELINE in the same change."
+        )
 
     report = {
         "test_name": "HELIX Attack Replay Verification",

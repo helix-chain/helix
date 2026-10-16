@@ -134,6 +134,35 @@ class ReplayGateTests(unittest.TestCase):
     def assert_exit_code(self, report, expected):
         self.assertEqual(report["summary"]["exit_code"], expected)
 
+    def run_main_with_injected_replay(self, contracts, outcomes, **options):
+        detector = FakeDetector(outcomes)
+        exit_codes = []
+        reports = []
+        original_run_replay = gate.run_replay
+        with tempfile.TemporaryDirectory(prefix="replay-main-") as temp_dir:
+            report_dir = Path(temp_dir) / "reports"
+            report_dir.mkdir()
+
+            def injected_run_replay():
+                report = original_run_replay(
+                    contracts=contracts,
+                    detector=detector,
+                    report_dir=report_dir,
+                    exit_code_callback=exit_codes.append,
+                    **options,
+                )
+                reports.append(report)
+                return report
+
+            stdout = io.StringIO()
+            with patch.object(gate, "run_replay", side_effect=injected_run_replay):
+                with redirect_stdout(stdout):
+                    with self.assertRaises(SystemExit) as raised:
+                        gate.main()
+            self.assertEqual(len(reports), 1)
+            self.assertEqual(len(list(report_dir.glob("replay_test_report_*.json"))), 1)
+            return raised.exception.code, exit_codes, reports[0], stdout.getvalue(), detector
+
     def test_all_detectable_and_patterns_confirmed_uses_contract_count(self):
         contracts = [
             contract("SIG-T1", ["missing_reentrancy_guard"]),
@@ -216,7 +245,7 @@ class ReplayGateTests(unittest.TestCase):
         self.assertEqual(baseline_report["summary"]["pattern_gap_new"], 0)
         self.assertIn("baselined gaps: 1", baseline_output)
 
-    def test_confirmed_baseline_gap_prints_tighten_hint(self):
+    def test_confirmed_baseline_gap_fails_as_stale(self):
         sig_id = "SIG-TIGHTEN"
         report, output, _ = self.run_gate(
             [contract(sig_id, ["missing_access_control"])],
@@ -224,9 +253,149 @@ class ReplayGateTests(unittest.TestCase):
             pattern_gap_baseline={sig_id},
         )
 
-        self.assert_exit_code(report, 0)
-        self.assertIn("TIGHTEN BASELINE", output)
+        self.assert_exit_code(report, 1)
+        self.assertEqual(report["summary"].get("pattern_gap_stale"), 1)
+        self.assertEqual(report["summary"]["pattern_gap_new"], 0)
+        self.assertIn("FAIL: stale pattern-gap baseline ids", output)
+        self.assertIn("remove them from PATTERN_GAP_BASELINE in the same change", output)
         self.assertIn(sig_id, output)
+        self.assertNotIn("TIGHTEN BASELINE", output)
+
+    def test_detectable_contracts_require_non_empty_string_patterns(self):
+        sig_id = "SIG-EXPECTED"
+        missing = {"sig_id": sig_id, "source": f"contract source for {sig_id}"}
+        empty = contract(sig_id, [])
+        non_list = contract(sig_id, [])
+        non_list["expected_patterns"] = "missing_reentrancy_guard"
+        empty_item = contract(sig_id, [""])
+        invalid_contracts = [
+            ("missing", missing),
+            ("empty", empty),
+            ("non-list", non_list),
+            ("empty-item", empty_item),
+        ]
+
+        for label, invalid in invalid_contracts:
+            with self.subTest(expected_patterns=label):
+                report, output, detector = self.run_gate(
+                    [invalid],
+                    {sig_id: {"function_reports": [function_report()]}},
+                )
+                self.assert_exit_code(report, 2)
+                self.assertEqual(detector.calls, [])
+                self.assertIn("detectable contracts need a non-empty expected_patterns", output)
+                self.assertIn(sig_id, output)
+
+    def test_excluded_contracts_may_omit_expected_patterns(self):
+        cases = (
+            ("beyond-empty", "beyond", []),
+            ("beyond-missing", "beyond", None),
+            ("known-empty", "known", []),
+            ("known-missing", "known", None),
+        )
+        for label, exclusion, expected in cases:
+            sig_id = f"SIG-EXCLUDED-{label}"
+            item = {"sig_id": sig_id, "source": f"contract source for {sig_id}"}
+            if expected is not None:
+                item["expected_patterns"] = expected
+            options = (
+                {"beyond_mvp": {sig_id}}
+                if exclusion == "beyond"
+                else {"known_undetectable": {sig_id}}
+            )
+            with self.subTest(expected_patterns=label):
+                report, output, detector = self.run_gate(
+                    [item],
+                    {sig_id: {"function_reports": [function_report()]}},
+                    **options,
+                )
+                self.assert_exit_code(report, 0)
+                self.assertEqual(detector.calls, [sig_id])
+                self.assertNotIn("INTEGRITY ERROR", output)
+
+    def test_regression_after_stale_baseline_removal_fails_as_new_gap(self):
+        sig_id = "SIG-STALE-THEN-REGRESSED"
+        contracts = [contract(sig_id, ["missing_access_control"])]
+        confirmed = {
+            sig_id: {
+                "function_reports": [function_report("missing_access_control")]
+            }
+        }
+        stale_report, stale_output, _ = self.run_gate(
+            contracts, confirmed, pattern_gap_baseline={sig_id}
+        )
+
+        regressed_report, regressed_output, _ = self.run_gate(
+            contracts,
+            {sig_id: {"function_reports": [function_report("spot_price_oracle")]}},
+        )
+
+        with self.subTest(state="stale baseline entry"):
+            self.assert_exit_code(stale_report, 1)
+            self.assertEqual(stale_report["summary"].get("pattern_gap_stale"), 1)
+            self.assertIn(sig_id, stale_output)
+        with self.subTest(state="regression after removal"):
+            self.assert_exit_code(regressed_report, 1)
+            self.assertEqual(regressed_report["summary"].get("pattern_gap_stale"), 0)
+            self.assertEqual(regressed_report["summary"]["pattern_gap_new"], 1)
+            self.assertEqual(regressed_report["summary"]["pattern_gap_baselined"], 0)
+            self.assertIn("NEW gaps: 1", regressed_output)
+
+    def test_empty_contracts_are_integrity_errors_for_default_and_empty_arguments(self):
+        for empty_beyond in (False, True):
+            for empty_known in (False, True):
+                for empty_baseline in (False, True):
+                    label = (empty_beyond, empty_known, empty_baseline)
+                    options = {}
+                    if empty_beyond:
+                        options["beyond_mvp"] = set()
+                    if empty_known:
+                        options["known_undetectable"] = set()
+                    if empty_baseline:
+                        options["pattern_gap_baseline"] = set()
+                    with self.subTest(empty_arguments=label):
+                        detector = FakeDetector({})
+                        with tempfile.TemporaryDirectory(prefix="replay-empty-") as temp_dir:
+                            report_dir = Path(temp_dir) / "reports"
+                            report_dir.mkdir()
+                            stdout = io.StringIO()
+                            with redirect_stdout(stdout):
+                                report = gate.run_replay(
+                                    contracts=[],
+                                    detector=detector,
+                                    report_dir=report_dir,
+                                    **options,
+                                )
+                        self.assert_exit_code(report, 2)
+                        self.assertEqual(detector.calls, [])
+                        self.assertIn("no contracts to replay", stdout.getvalue())
+
+    def test_main_exits_two_for_empty_contracts_and_reports_callback(self):
+        code, callbacks, report, output, detector = self.run_main_with_injected_replay(
+            [], {}, beyond_mvp=set(), known_undetectable=set(), pattern_gap_baseline=set()
+        )
+
+        self.assertEqual(code, 2)
+        self.assertEqual(callbacks, [2])
+        self.assertEqual(report["summary"]["exit_code"], 2)
+        self.assertEqual(detector.calls, [])
+        self.assertIn("no contracts to replay", output)
+
+    def test_main_exits_one_for_stale_baseline_and_reports_callback(self):
+        sig_id = "SIG-MAIN-STALE"
+        code, callbacks, report, output, _ = self.run_main_with_injected_replay(
+            [contract(sig_id, ["missing_access_control"])],
+            {sig_id: {"function_reports": [function_report("missing_access_control")]}},
+            beyond_mvp=set(),
+            known_undetectable=set(),
+            pattern_gap_baseline={sig_id},
+        )
+
+        self.assertEqual(code, 1)
+        self.assertEqual(callbacks, [1])
+        self.assertEqual(report["summary"].get("pattern_gap_stale"), 1)
+        self.assertIn(sig_id, output)
+        self.assertIn("FAIL: stale pattern-gap baseline ids", output)
 
     def test_empty_expected_patterns_are_not_pattern_gaps(self):
         sig_id = "SIG-N-A"
@@ -316,6 +485,17 @@ class ReplayGateTests(unittest.TestCase):
         self.assertEqual(len(gate.PATTERN_GAP_BASELINE), 20)
         self.assertTrue(gate.PATTERN_GAP_BASELINE <= detectable_ids)
         self.assertTrue(all(contracts_by_id[sig_id]["expected_patterns"] for sig_id in gate.PATTERN_GAP_BASELINE))
+        for sig_id in sorted(detectable_ids):
+            with self.subTest(sig_id=sig_id):
+                expected_patterns = contracts_by_id[sig_id].get("expected_patterns")
+                self.assertIsInstance(expected_patterns, (list, tuple))
+                self.assertTrue(expected_patterns)
+                self.assertTrue(
+                    all(
+                        isinstance(pattern, str) and pattern
+                        for pattern in expected_patterns
+                    )
+                )
 
     def test_main_exits_with_report_exit_code(self):
         if not hasattr(gate, "main"):
