@@ -45,12 +45,32 @@ class CommentAndStringMaskTests(unittest.TestCase):
         self.assertEqual(masked[continued.index('"')], '"')
         self.assertEqual(masked[continued.rindex('"')], '"')
         self.assertTrue(all(char == " " for char in masked[continued.index('"') + 1:continued.rindex('"')] if char != "\n"))
+        self.assertEqual(mask(masked), masked)
         self.assertIn("second", mask('value = "unterminated\nsecond line;'))
         open_block = 'value; /* unfinished\nstring " and braces }'
         masked_block = mask(open_block)
         self.assertEqual(len(masked_block), len(open_block))
         self.assertTrue(all(char in (" ", "\n") for char in masked_block[open_block.index("/*"):]))
         self.assertEqual(mask(masked_block), masked_block)
+
+    def test_unicode_line_terminators_survive_and_end_comments_and_strings(self):
+        mask = mismatch_detector.mask_comments_and_strings
+        for separator in ("\v", "\f", "\x85", "\u2028", "\u2029"):
+            with self.subTest(separator=repr(separator)):
+                comment_source = "// hidden" + separator + "function visible;\n"
+                comment_masked = mask(comment_source)
+                self.assertEqual(comment_masked[comment_source.index(separator)], separator)
+                self.assertIn("function visible;", comment_masked)
+
+                block_source = "/* hidden" + separator + " text */"
+                block_masked = mask(block_source)
+                self.assertEqual(block_masked[block_source.index(separator)], separator)
+
+                string_source = 'value = "hidden' + separator + "function visible;"
+                string_masked = mask(string_source)
+                self.assertEqual(string_masked[string_source.index(separator)], separator)
+                self.assertIn("function visible;", string_masked)
+                self.assertEqual(mask(string_masked), string_masked)
 
 
 class CommentIndependentRiskTests(unittest.TestCase):
@@ -253,10 +273,10 @@ class SpecialFunctionTests(unittest.TestCase):
 
         repo=Path(__file__).resolve().parent
         with tempfile.TemporaryDirectory(dir=repo) as temp_dir:
-            sol_path=Path(temp_dir) / "empty.sol"
-            sol_path.write_text("contract Empty {}", encoding="utf-8")
+            source_path=Path(temp_dir) / "empty.sol"
+            source_path.write_text("contract Empty {}", encoding="utf-8")
             proc=subprocess.run(
-                [sys.executable, str(repo / "helix_scan.py"), "--json", str(sol_path)],
+                [sys.executable, str(repo / "helix_scan.py"), "--json", str(source_path)],
                 cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
         self.assertEqual(proc.returncode, 2)
@@ -264,6 +284,18 @@ class SpecialFunctionTests(unittest.TestCase):
         self.assertTrue(proc.stderr.startswith("[ERROR]"), proc.stderr)
         self.assertIn("no analysable functions were found", proc.stderr.lower())
         self.assertIn("nothing was scanned", proc.stderr.lower())
+
+
+class RiskPatternKeyTests(unittest.TestCase):
+    def test_risk_pattern_keys_keep_the_required_order(self):
+        expected = [
+            "external_call_before_state_update",
+            "missing_reentrancy_guard",
+            "unchecked_arithmetic",
+            "missing_access_control",
+            "spot_price_oracle",
+        ]
+        self.assertEqual(list(mismatch_detector.CodeEncoder.RISK_PATTERNS), expected)
 
 
 if __name__ == "__main__":

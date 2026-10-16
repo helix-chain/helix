@@ -57,15 +57,16 @@ def mask_comments_and_strings(source: str) -> str:
     masked = list(source)
     length = len(source)
     index = 0
+    line_terminators = "\r\n\v\f\x85\u2028\u2029"
 
     def blank(position: int) -> None:
-        if source[position] not in "\r\n":
+        if source[position] not in line_terminators:
             masked[position] = " "
 
     while index < length:
         if source.startswith("//", index):
             end = index
-            while end < length and source[end] not in "\r\n":
+            while end < length and source[end] not in line_terminators:
                 end += 1
             for position in range(index, end):
                 blank(position)
@@ -85,6 +86,13 @@ def mask_comments_and_strings(source: str) -> str:
             index += 1
             continue
 
+        masked_end = index + 1
+        while masked_end < length and source[masked_end].isspace():
+            masked_end += 1
+        if masked_end < length and source[masked_end] == quote:
+            index = masked_end + 1
+            continue
+
         index += 1
         while index < length:
             char = source[index]
@@ -102,13 +110,16 @@ def mask_comments_and_strings(source: str) -> str:
                 if source[index + 1] == "\n":
                     index += 2
                     continue
+                if source[index + 1] in line_terminators:
+                    index += 1
+                    break
                 blank(index + 1)
                 index += 2
                 continue
             if char == quote:
                 index += 1
                 break
-            if char in "\r\n":
+            if char in line_terminators:
                 break
             blank(index)
             index += 1
